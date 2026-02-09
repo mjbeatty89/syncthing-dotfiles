@@ -1,0 +1,79 @@
+# Syncthing ignore patterns for dotfiles
+# This file tells Syncthing what NOT to sync
+
+# Version control
+.git
+.svn
+.hg
+
+# SSH Keys (NEVER sync private keys!)
+**/id_rsa
+**/id_rsa.*
+**/id_ed25519
+**/id_ed25519.*
+**/id_dsa
+**/id_dsa.*
+**/id_ecdsa
+**/id_ecdsa.*
+**/*.pem
+**/*.key
+**/known_hosts
+
+# GPG Keys
+**/*.gpg
+**/*.asc
+**/secring.*
+**/pubring.*
+**/trustdb.gpg
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Cache directories
+**/cache/
+**/.cache/
+**/Cache/
+
+# History files (optional - uncomment if you don't want to sync)
+# .zsh_history
+# .bash_history
+# .node_repl_history
+# .python_history
+
+# VS Code workspace-specific
+*.code-workspace
+**/workspaceStorage/
+**/globalStorage/
+**/logs/
+
+# Secrets and credentials
+.env
+.env.*
+**/secrets
+**/credentials
+*.secret
+.zshrc.secrets
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Lock files
+*.lock
+package-lock.json
+yarn.lock

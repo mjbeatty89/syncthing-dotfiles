@@ -1,0 +1,81 @@
+# Include 1Password SSH agent configuration
+Include ~/.ssh/1Password/config
+
+# Global defaults for all connections
+Host *
+	# Use 1Password SSH agent
+	IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+	ForwardAgent yes
+	
+	# Connection reuse - speeds up multiple connections to same host
+	ControlMaster auto
+	ControlPath ~/.ssh/agent/%C
+	ControlPersist 10m
+	
+	# Keep connections alive
+	ServerAliveInterval 60
+	ServerAliveCountMax 3
+	TCPKeepAlive yes
+	
+	# Security & convenience
+	AddKeysToAgent yes
+	Compression yes
+	
+	# Faster connection on local network
+	GSSAPIAuthentication no
+
+# ============================================
+# Primary Servers - Quick Access Aliases
+# ============================================
+
+# Home Assistant
+Host ha homeassistant
+	HostName 10.1.30.10
+	User mjb
+
+# Frigate NVR
+Host frigate nvr
+	HostName 10.1.30.213
+	User mjb
+
+# Windows Server (WiFi)
+Host winserv win
+	HostName 10.1.30.19
+	User mjb
+
+# Ubuntu Server
+Host ubuntu ub
+	HostName 10.1.11.129
+	User mjb
+
+# Spotify Matrix Display Pi
+Host spotify-pi pi-matrix
+	HostName 10.1.10.55
+	User mjb
+	IdentitiesOnly yes
+	IdentityFile ~/.ssh/ssh_key
+
+# ============================================
+# Raspberry Pi Pattern Matching
+# ============================================
+
+# RPi devices - use wildcard patterns for easy additions
+Host rpi* pi*
+	User mjb
+	# Add new Pi's to known_hosts automatically during initial setup
+	StrictHostKeyChecking accept-new
+
+# ============================================
+# Git Configuration
+# ============================================
+
+# Personal GitHub
+Host github.com github
+	HostName github.com
+	User git
+	# 1Password will provide the key automatically
+
+# GitHub alias for this repo
+Host mjbeatty89
+	HostName github.com
+	User git

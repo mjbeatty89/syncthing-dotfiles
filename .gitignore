@@ -1,0 +1,28 @@
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Secrets (just in case)
+*.secret
+.env
+.env.*
+
+# Syncthing metadata
+.stfolder/
+.stversions/
+
+# History files (optional - personal preference)
+.zsh_history
+.bash_history

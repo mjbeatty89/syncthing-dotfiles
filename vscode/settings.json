@@ -1,0 +1,21 @@
+{
+    "projectManager.git.baseFolders": [
+        "",
+        "/Volumes/mm2ssd/dev"
+    ],
+    "yaml.schemas": {
+        "file:///Users/mjb/.vscode/extensions/continue.continue-1.2.14-darwin-arm64/config-yaml-schema.json": [
+            ".continue/**/*.yaml"
+        ],
+        "file:///c%3A/Users/SZ44Q0/.vscode/extensions/continue.continue-1.2.14-win32-x64/config-yaml-schema.json": [
+            ".continue/**/*.yaml"
+        ]
+    },
+    "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
+    "geminicodeassist.codeGenerationPaneViewEnabled": true,
+    "geminicodeassist.verboseLogging": true,
+    "geminicodeassist.project": "llms-465414",
+    "githubPullRequests.pullBranch": "never",
+    "gitlens.ai.model": "vscode",
+    "gitlens.ai.vscode.model": "copilot:gpt-4.1"
+}
