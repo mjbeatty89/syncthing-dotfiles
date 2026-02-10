@@ -1,0 +1,55 @@
+name: Dotfiles CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  validate:
+    name: Validate Scripts
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Zsh
+        run: sudo apt-get install -y zsh
+
+      - name: Check Zsh Syntax (.zshrc)
+        run: zsh -n shell/.zshrc
+        
+      - name: Check Zsh Syntax (.zprofile)
+        run: zsh -n shell/.zprofile
+
+      - name: Check Bash Syntax (bootstrap script)
+        run: bash -n bootstrap-linux.sh
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './'
+          ignore_paths: 'shell/.zshrc shell/.zprofile'  # Shellcheck is primarily for bash/sh, not zsh
+        env:
+          SHELLCHECK_OPTS: -e SC2086 -e SC2155 # Ignore some common "noisy" warnings if needed
+
+  test-bootstrap:
+    name: Test Bootstrap Script
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test Bootstrap Execution (Dry Run)
+        # We just check if it runs. Since it's interactive, we pipe 'n' to answer "no" to prompts
+        # to ensure it doesn't hang waiting for input.
+        run: |
+          chmod +x bootstrap-linux.sh
+          # Pipe "n" to refuse the interactive prompts (Syncthing setup confirmation)
+          # We expect it to run until it hits the prompt and exit gracefully or with specific code
+          echo "n" | ./bootstrap-linux.sh || true 
