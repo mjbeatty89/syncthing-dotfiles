@@ -36,6 +36,13 @@ if [ "$OS_TYPE" = "linux" ]; then
     [ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
 fi
 
+# Linux: source local credentials (populated from 1Password)
+# ~/.env.tokens contains: GH_TOKEN=<github_pat>
+# gh CLI reads GH_TOKEN automatically; git uses it via credential helper
+if [ "$OS_TYPE" = "linux" ]; then
+    [[ -f ~/.env.tokens ]] && source ~/.env.tokens
+fi
+
 # ============================================================================
 # API Keys and Secrets
 # ============================================================================
