@@ -63,7 +63,7 @@ if command -v dotenvx &> /dev/null; then
     alias withai='dotenvx run -f "$OP_ENV_AI" --'
 else
     withai() {
-        echo "Install dotenvx first: brew install dotenvx" >&2
+        echo "Install dotenvx first: https://github.com/dotenvx/dotenvx#installation" >&2
         return 1
     }
 fi
@@ -149,9 +149,10 @@ zstyle ':autocomplete:*' min-delay 0.05  # seconds (float)
 # ============================================================================
 export CLICOLOR=1
 export LSCOLORS=GxFxCxDxBxegedabagaced
-
-# Enable colored output for grep
-export GREP_OPTIONS='--color=auto'
+# Enable colored output for grep (without deprecated GREP_OPTIONS)
+if ! command -v rg &> /dev/null; then
+    alias grep='grep --color=auto'
+fi
 export GREP_COLOR='1;32'
 
 # ============================================================================
@@ -402,8 +403,10 @@ alias m='make'
 if [ "$OS_TYPE" = "mac" ]; then
     alias code='/Applications/Visual\\ Studio\\ Code.app/Contents/Resources/app/bin/code'
 elif [ "$OS_TYPE" = "linux" ]; then
-    # Linux - usually already in PATH
-    command -v code &>/dev/null || alias code='code'
+    # Linux fallback to VSCodium if VS Code is not installed
+    if ! command -v code &>/dev/null && command -v codium &>/dev/null; then
+        alias code='codium'
+    fi
 fi
 
 # Quick directory navigation
@@ -428,10 +431,24 @@ fi
 alias ports='lsof -i -P | grep LISTEN'
 
 # SSH Shortcuts
-alias ssh-check='~/.ssh/check-hosts.sh'
 alias ssh-config='${EDITOR:-nano} ~/.ssh/config'
-alias ssh-backup='cd ~/.ssh && git status && git log --oneline -5'
-alias rpi-bootstrap='~/.ssh/bootstrap-rpi.sh'
+if [ -x "$HOME/.ssh/check-hosts.sh" ]; then
+    alias ssh-check="$HOME/.ssh/check-hosts.sh"
+elif [ -x "$HOME/dev/homesync/ssh-config/check-hosts.sh" ]; then
+    alias ssh-check="$HOME/dev/homesync/ssh-config/check-hosts.sh"
+fi
+
+if [ -d "$HOME/dev/homesync/ssh-config/.git" ]; then
+    alias ssh-backup="cd $HOME/dev/homesync/ssh-config && git --no-pager status && git --no-pager log --oneline -5"
+else
+    alias ssh-backup='cd ~/.ssh && git --no-pager status && git --no-pager log --oneline -5'
+fi
+
+if [ -x "$HOME/.ssh/bootstrap-rpi.sh" ]; then
+    alias rpi-bootstrap="$HOME/.ssh/bootstrap-rpi.sh"
+elif [ -x "$HOME/dev/homesync/ssh-config/bootstrap-rpi.sh" ]; then
+    alias rpi-bootstrap="$HOME/dev/homesync/ssh-config/bootstrap-rpi.sh"
+fi
 
 # Quick SSH to primary servers
 alias sha='ssh ha'
@@ -510,8 +527,8 @@ extract() {
 }
 
 # Quick find file/directory
-ff() { find . -type f -name "*$1*"; }
-fd() { find . -type d -name "*$1*"; }
+ff() { command find . -type f -name "*$1*"; }
+fdir() { command find . -type d -name "*$1*"; }
 
 # Git commit with message
 gcm() {
@@ -541,6 +558,9 @@ fi
 # Load machine-specific config if it exists
 HOSTNAME=$(hostname -s)
 MACHINE_CONFIG="$HOME/dotfiles/zsh/machines/${HOSTNAME}.zsh"
+if [ ! -f "$MACHINE_CONFIG" ] && [ -f "$HOME/dev/homesync/dotfiles/zsh/machines/${HOSTNAME}.zsh" ]; then
+    MACHINE_CONFIG="$HOME/dev/homesync/dotfiles/zsh/machines/${HOSTNAME}.zsh"
+fi
 if [ -f "$MACHINE_CONFIG" ]; then
     source "$MACHINE_CONFIG"
 fi
@@ -577,39 +597,52 @@ else
 fi
 echo "💡 Tip: Use 'fuck' or 'fk' to correct the last command"
 
-# Added by LM Studio CLI (lms)
-export PATH="$PATH:/Users/mjb/.lmstudio/bin"
-# End of LM Studio CLI section
+# ============================================================================
+# Optional Local Tool Integrations (guarded for cross-platform use)
+# ============================================================================
 
-# The following lines have been added by Docker Desktop to enable Docker CLI completions.
-fpath=(/Users/mjb/.docker/completions $fpath)
-autoload -Uz compinit
-compinit
-# End of Docker CLI completions
+# LM Studio
+[ -d "$HOME/.lmstudio/bin" ] && export PATH="$HOME/.lmstudio/bin:$PATH"
 
-source /Users/mjb/.config/broot/launcher/bash/br
-export PATH="$HOME/.local/bin:$PATH"
+# Docker Desktop completions (macOS)
+if [ "$OS_TYPE" = "mac" ] && [ -d "$HOME/.docker/completions" ]; then
+    fpath=("$HOME/.docker/completions" $fpath)
+fi
 
-# Added by Antigravity
-export PATH="/Users/mjb/.antigravity/antigravity/bin:$PATH"
+# Broot launcher
+if [ -f "$HOME/.config/broot/launcher/zsh/br" ]; then
+    source "$HOME/.config/broot/launcher/zsh/br"
+elif [ -f "$HOME/.config/broot/launcher/bash/br" ]; then
+    source "$HOME/.config/broot/launcher/bash/br"
+fi
 
-# opencode
-export PATH=/Users/mjb/.opencode/bin:$PATH
+# Antigravity / OpenCode
+[ -d "$HOME/.antigravity/antigravity/bin" ] && export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
+[ -d "$HOME/.opencode/bin" ] && export PATH="$HOME/.opencode/bin:$PATH"
 
-. "$HOME/.langflow/uv/env"
+# Langflow local environment
+[ -f "$HOME/.langflow/uv/env" ] && . "$HOME/.langflow/uv/env"
 
 # pnpm
-export PNPM_HOME="/Users/mjb/Library/pnpm"
+if [ "$OS_TYPE" = "mac" ]; then
+    export PNPM_HOME="$HOME/Library/pnpm"
+else
+    export PNPM_HOME="$HOME/.local/share/pnpm"
+fi
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 # pnpm end
 
-# bun completions
-[ -s "/Volumes/mm2ssd/mjb2/dotfiles2/.bun/_bun" ] && source "/Volumes/mm2ssd/mjb2/dotfiles2/.bun/_bun"
-
 # bun
+if [ -s "$HOME/.bun/_bun" ]; then
+    source "$HOME/.bun/_bun"
+fi
 export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
-eval "$(openv init zsh)"
+[ -d "$BUN_INSTALL/bin" ] && export PATH="$BUN_INSTALL/bin:$PATH"
+
+# openv
+if command -v openv &> /dev/null; then
+    eval "$(openv init zsh)"
+fi

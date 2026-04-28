@@ -5,6 +5,9 @@
 
 set -e  # Exit on error
 
+HOMESYNC_DIR="${HOMESYNC_DIR:-$HOME/dev/homesync}"
+SYNC_DOTFILES_DIR="${SYNC_DOTFILES_DIR:-$HOMESYNC_DIR/syncthing-dotfiles}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -83,9 +86,10 @@ install_syncthing() {
 
 # Create Syncthing directories
 setup_directories() {
-    print_status "Creating Syncthing directory structure..."
-    mkdir -p ~/Syncthing/dotfiles/{shell,git,ssh,vscode,config}
-    print_status "Directory structure created"
+    print_status "Preparing homesync directory structure..."
+    mkdir -p "$HOMESYNC_DIR"
+    mkdir -p "$SYNC_DOTFILES_DIR"/{shell,git,ssh,vscode,config}
+    print_status "Using synced config path: $SYNC_DOTFILES_DIR"
 }
 
 # Create symlinks for dotfiles
@@ -115,33 +119,33 @@ create_symlinks() {
     }
     
     # Shell configurations
-    safe_symlink ~/Syncthing/dotfiles/shell/.zshrc ~/.zshrc
-    safe_symlink ~/Syncthing/dotfiles/shell/.zprofile ~/.zprofile
+    safe_symlink "$SYNC_DOTFILES_DIR/shell/.zshrc" ~/.zshrc
+    safe_symlink "$SYNC_DOTFILES_DIR/shell/.zprofile" ~/.zprofile
     
     # If using bash instead of zsh
-    if [ -f ~/Syncthing/dotfiles/shell/.bashrc ]; then
-        safe_symlink ~/Syncthing/dotfiles/shell/.bashrc ~/.bashrc
+    if [ -f "$SYNC_DOTFILES_DIR/shell/.bashrc" ]; then
+        safe_symlink "$SYNC_DOTFILES_DIR/shell/.bashrc" ~/.bashrc
     fi
-    if [ -f ~/Syncthing/dotfiles/shell/.bash_profile ]; then
-        safe_symlink ~/Syncthing/dotfiles/shell/.bash_profile ~/.bash_profile
+    if [ -f "$SYNC_DOTFILES_DIR/shell/.bash_profile" ]; then
+        safe_symlink "$SYNC_DOTFILES_DIR/shell/.bash_profile" ~/.bash_profile
     fi
     
     # Git configuration
-    safe_symlink ~/Syncthing/dotfiles/git/.gitconfig ~/.gitconfig
+    safe_symlink "$SYNC_DOTFILES_DIR/git/.gitconfig" ~/.gitconfig
     
     # SSH config (NOT keys!)
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
-    safe_symlink ~/Syncthing/dotfiles/ssh/config ~/.ssh/config
+    safe_symlink "$SYNC_DOTFILES_DIR/ssh/config" ~/.ssh/config
     chmod 600 ~/.ssh/config
     
     # VS Code settings (Linux path)
     if [ -d ~/.config/Code ]; then
         mkdir -p ~/.config/Code/User
-        safe_symlink ~/Syncthing/dotfiles/vscode/settings.json ~/.config/Code/User/settings.json
+        safe_symlink "$SYNC_DOTFILES_DIR/vscode/settings.json" ~/.config/Code/User/settings.json
         
-        if [ -f ~/Syncthing/dotfiles/vscode/keybindings.json ]; then
-            safe_symlink ~/Syncthing/dotfiles/vscode/keybindings.json ~/.config/Code/User/keybindings.json
+        if [ -f "$SYNC_DOTFILES_DIR/vscode/keybindings.json" ]; then
+            safe_symlink "$SYNC_DOTFILES_DIR/vscode/keybindings.json" ~/.config/Code/User/keybindings.json
         fi
     fi
     
@@ -237,6 +241,7 @@ install_additional_tools() {
 # Main installation flow
 main() {
     print_status "Starting Syncthing dotfiles bootstrap for Linux"
+    print_status "Expected synced repository path: $SYNC_DOTFILES_DIR"
     echo ""
     
     # Detect distribution
@@ -259,8 +264,8 @@ main() {
     # Note about syncing
     print_warning "IMPORTANT: Before creating symlinks, you need to:"
     print_warning "1. Start Syncthing and access the web UI at http://localhost:8384"
-    print_warning "2. Add this device to your Syncthing network from your Mac"
-    print_warning "3. Accept the 'dotfiles' folder share from your Mac"
+    print_warning "2. Add this device to your Syncthing network from your primary machine"
+    print_warning "3. Accept the shared homesync folder and ensure syncthing-dotfiles is present"
     print_warning "4. Wait for initial sync to complete"
     echo ""
     

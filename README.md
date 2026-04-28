@@ -6,7 +6,7 @@ This directory contains synchronized dotfiles managed through Syncthing for cons
 ## Directory Structure
 
 ```
-~/Syncthing/dotfiles/
+~/dev/homesync/syncthing-dotfiles/
 ├── shell/          # Shell configurations (zsh/bash)
 ├── git/            # Git configuration
 ├── ssh/            # SSH config (no private keys!)
@@ -27,22 +27,22 @@ This directory contains synchronized dotfiles managed through Syncthing for cons
 1. **Install Syncthing** (if not already installed)
 2. **Run the bootstrap script**:
    ```bash
-   curl -O [syncthing-device-url]/bootstrap-linux.sh
+   cd ~/dev/homesync/syncthing-dotfiles
    bash bootstrap-linux.sh
    ```
 3. **Configure Syncthing**:
    - Access web UI at `http://localhost:8384`
-   - Add device using ID from your Mac
-   - Accept the 'dotfiles' folder share
+   - Add device using ID from your primary machine
+   - Accept the `homesync` folder share
    - Wait for initial sync
 
 ## Setting Up on Mac
 
 Already configured! The symlinks are:
-- `~/.zshrc` → `~/Syncthing/dotfiles/shell/.zshrc`
-- `~/.zprofile` → `~/Syncthing/dotfiles/shell/.zprofile`
-- `~/.gitconfig` → `~/Syncthing/dotfiles/git/.gitconfig`
-- `~/Library/Application Support/Code/User/settings.json` → `~/Syncthing/dotfiles/vscode/settings.json`
+- `~/.zshrc` → `~/dev/homesync/syncthing-dotfiles/shell/.zshrc`
+- `~/.zprofile` → `~/dev/homesync/syncthing-dotfiles/shell/.zprofile`
+- `~/.gitconfig` → `~/dev/homesync/syncthing-dotfiles/git/.gitconfig`
+- `~/Library/Application Support/Code/User/settings.json` → `~/dev/homesync/syncthing-dotfiles/vscode/settings.json`
 
 ## Security Notes
 
@@ -90,5 +90,4 @@ You might want to add:
 - `.config/starship.toml` - Shell prompt theme
 - `.aliases` - Custom command aliases
 - `.functions` - Custom shell functions
-
-Simply copy them to the appropriate folder in `~/Syncthing/dotfiles/` and create symlinks.
+Simply copy them to the appropriate folder in `~/dev/homesync/syncthing-dotfiles/` and create symlinks.
