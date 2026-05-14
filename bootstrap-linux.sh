@@ -1,9 +1,9 @@
 #!/bin/bash
 # Bootstrap script for setting up Syncthing and dotfiles on Linux devices
 # Author: Matthew Beatty
-# Usage: bash bootstrap-linux.sh
+# Usage: bash bootstrap-linux.sh [--yes] [--skip-tools] [--skip-sync-check] [--dotfiles-dir PATH] [--sync-base PATH]
 
-set -e  # Exit on error
+set -euo pipefail
 
 HOMESYNC_DIR="${HOMESYNC_DIR:-$HOME/dev/homesync}"
 SYNC_DOTFILES_DIR="${SYNC_DOTFILES_DIR:-$HOMESYNC_DIR/syncthing-dotfiles}"
@@ -14,7 +14,27 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Function to print colored output
+# Script/default paths
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$SCRIPT_DIR}"
+if [ -d "$HOME/homesync" ]; then
+    SYNC_BASE_DEFAULT="$HOME/homesync"
+else
+    SYNC_BASE_DEFAULT="$HOME/Syncthing"
+fi
+SYNC_BASE="${SYNC_BASE:-$SYNC_BASE_DEFAULT}"
+
+# Flags
+AUTO_YES=0
+SKIP_TOOLS=0
+SKIP_SYNC_CHECK=0
+
+# Runtime globals
+OS=""
+DISTRO_ID=""
+backup_dir="$HOME/.dotfiles-backup-$(date +%Y%m%d-%H%M%S)"
+backup_dir_created=0
+
 print_status() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
@@ -27,199 +47,294 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Detect Linux distribution
+usage() {
+    cat <<EOF
+Usage: bash bootstrap-linux.sh [OPTIONS]
+
+Options:
+  -y, --yes               Run non-interactively (assume yes for prompts)
+      --skip-tools        Skip optional additional CLI tool installation
+      --skip-sync-check   Skip required-file sync checks before creating symlinks
+      --dotfiles-dir PATH Dotfiles source directory (default: script directory)
+      --sync-base PATH    Syncthing root directory (default: \$HOME/homesync or \$HOME/Syncthing)
+  -h, --help              Show this help
+
+Environment variable overrides:
+  DOTFILES_DIR, SYNC_BASE
+EOF
+}
+
+parse_args() {
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            -y|--yes)
+                AUTO_YES=1
+                ;;
+            --skip-tools)
+                SKIP_TOOLS=1
+                ;;
+            --skip-sync-check)
+                SKIP_SYNC_CHECK=1
+                ;;
+            --dotfiles-dir)
+                DOTFILES_DIR="${2:-}"
+                shift
+                ;;
+            --sync-base)
+                SYNC_BASE="${2:-}"
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                print_error "Unknown argument: $1"
+                usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
+}
+
+prompt_yes_no() {
+    local prompt="$1"
+    local default="${2:-n}"
+    local reply=""
+
+    if [ "$AUTO_YES" -eq 1 ]; then
+        return 0
+    fi
+
+    if [ "$default" = "y" ]; then
+        read -r -p "$prompt [Y/n]: " reply
+        [ -z "$reply" ] && reply="y"
+    else
+        read -r -p "$prompt [y/N]: " reply
+        [ -z "$reply" ] && reply="n"
+    fi
+
+    [[ "$reply" =~ ^[Yy]$ ]]
+}
+
 detect_distro() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
-        OS=$NAME
-        VER=$VERSION_ID
-        ID=$ID
+        OS="${NAME:-Unknown Linux}"
+        DISTRO_ID="${ID:-unknown}"
     else
         print_error "Cannot detect Linux distribution"
         exit 1
     fi
 }
 
-# Install Syncthing based on distribution
+validate_paths() {
+    if [ -z "$DOTFILES_DIR" ] || [ ! -d "$DOTFILES_DIR" ]; then
+        print_error "DOTFILES_DIR does not exist: $DOTFILES_DIR"
+        exit 1
+    fi
+
+    mkdir -p "$SYNC_BASE/dotfiles"
+    mkdir -p "$SYNC_BASE/dotfiles"/{shell,git,ssh,vscode,config}
+}
+
 install_syncthing() {
     print_status "Installing Syncthing for $OS..."
-    
-    case $ID in
+
+    case "$DISTRO_ID" in
         ubuntu|debian)
-            # Add Syncthing repository
             sudo apt-get update
-            sudo apt-get install -y curl apt-transport-https
-            
-            # Add Syncthing release key
+            sudo apt-get install -y curl apt-transport-https gpg
+
             sudo mkdir -p /usr/share/keyrings
-            curl -L https://syncthing.net/release-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/syncthing-archive-keyring.gpg
-            
-            # Add repository
-            echo "deb [signed-by=/usr/share/keyrings/syncthing-archive-keyring.gpg] https://apt.syncthing.net/ syncthing stable" | sudo tee /etc/apt/sources.list.d/syncthing.list
-            
-            # Install
+            curl -fsSL https://syncthing.net/release-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/syncthing-archive-keyring.gpg
+
+            echo "deb [signed-by=/usr/share/keyrings/syncthing-archive-keyring.gpg] https://apt.syncthing.net/ syncthing stable" | sudo tee /etc/apt/sources.list.d/syncthing.list >/dev/null
+
             sudo apt-get update
             sudo apt-get install -y syncthing
             ;;
-            
+
         fedora|rhel|centos)
             sudo dnf install -y syncthing
             ;;
-            
-        arch|manjaro)
-            sudo pacman -S --noconfirm syncthing
+
+        arch|manjaro|cachyos)
+            sudo pacman -S --needed --noconfirm syncthing
             ;;
-            
-        opensuse*)
+
+        opensuse*|sles)
             sudo zypper install -y syncthing
             ;;
-            
+
         *)
-            print_warning "Unsupported distribution. Please install Syncthing manually."
-            print_status "Visit: https://syncthing.net/downloads/"
+            print_warning "Unsupported distribution for automatic install."
+            print_status "Install Syncthing manually: https://syncthing.net/downloads/"
             return 1
             ;;
     esac
-    
+
     print_status "Syncthing installed successfully"
 }
 
-# Create Syncthing directories
-setup_directories() {
-    print_status "Preparing homesync directory structure..."
-    mkdir -p "$HOMESYNC_DIR"
-    mkdir -p "$SYNC_DOTFILES_DIR"/{shell,git,ssh,vscode,config}
-    print_status "Using synced config path: $SYNC_DOTFILES_DIR"
+is_same_link() {
+    local source="$1"
+    local target="$2"
+
+    [ -L "$target" ] || return 1
+    [ "$(readlink -f "$target")" = "$(readlink -f "$source")" ]
 }
 
-# Create symlinks for dotfiles
+safe_symlink() {
+    local source="$1"
+    local target="$2"
+
+    if [ ! -e "$source" ]; then
+        print_warning "Source missing, skipping: $source"
+        return 0
+    fi
+
+    if is_same_link "$source" "$target"; then
+        print_status "Already linked: $target → $source"
+        return 0
+    fi
+
+    if [ -e "$target" ] || [ -L "$target" ]; then
+        if [ "$backup_dir_created" -eq 0 ]; then
+            mkdir -p "$backup_dir"
+            backup_dir_created=1
+        fi
+
+        local backup_target="$backup_dir/$(basename "$target")"
+        if [ -e "$backup_target" ] || [ -L "$backup_target" ]; then
+            backup_target="$backup_target.$(date +%H%M%S)"
+        fi
+
+        print_warning "Backing up existing $target to $backup_target"
+        mv "$target" "$backup_target"
+    fi
+
+    mkdir -p "$(dirname "$target")"
+    ln -s "$source" "$target"
+    print_status "Linked $target → $source"
+}
+
+check_required_dotfiles() {
+    local missing=0
+    local required_files=(
+        "shell/.zshrc"
+        "shell/.zprofile"
+        "git/.gitconfig"
+        "ssh/config"
+    )
+
+    for relpath in "${required_files[@]}"; do
+        if [ ! -f "$DOTFILES_DIR/$relpath" ]; then
+            print_warning "Missing expected file: $DOTFILES_DIR/$relpath"
+            missing=1
+        fi
+    done
+
+    return "$missing"
+}
+
 create_symlinks() {
-    print_status "Creating symlinks for dotfiles..."
-    
-    # Backup existing files if they exist and aren't already symlinks
-    backup_dir=~/.dotfiles-backup-$(date +%Y%m%d-%H%M%S)
-    mkdir -p "$backup_dir"
-    
-    # Function to safely create symlink
-    safe_symlink() {
-        local source=$1
-        local target=$2
-        
-        if [ -e "$target" ] && [ ! -L "$target" ]; then
-            print_warning "Backing up existing $target to $backup_dir"
-            cp -a "$target" "$backup_dir/" 2>/dev/null || true
+    print_status "Creating symlinks from dotfiles source: $DOTFILES_DIR"
+
+    mkdir -p "$HOME/.config/zsh"
+
+    # Minimal .zshenv in HOME to point to XDG config
+    safe_symlink "$DOTFILES_DIR/shell/.zshenv" "$HOME/.zshenv"
+
+    # Actual zsh configurations in XDG location
+    safe_symlink "$DOTFILES_DIR/shell/.zshrc" "$HOME/.config/zsh/.zshrc"
+    safe_symlink "$DOTFILES_DIR/shell/.zprofile" "$HOME/.config/zsh/.zprofile"
+
+    [ -f "$DOTFILES_DIR/shell/.bashrc" ] && safe_symlink "$DOTFILES_DIR/shell/.bashrc" "$HOME/.bashrc"
+    [ -f "$DOTFILES_DIR/shell/.bash_profile" ] && safe_symlink "$DOTFILES_DIR/shell/.bash_profile" "$HOME/.bash_profile"
+
+    safe_symlink "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
+
+    mkdir -p "$HOME/.ssh"
+    chmod 700 "$HOME/.ssh"
+    safe_symlink "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
+    [ -L "$HOME/.ssh/config" ] || [ -f "$HOME/.ssh/config" ] && chmod 600 "$HOME/.ssh/config"
+
+    local vscode_targets=(
+        "$HOME/.config/Code/User"
+        "$HOME/.config/Code - OSS/User"
+        "$HOME/.vscode-oss/User"
+    )
+    local vscode_linked=0
+    for target_dir in "${vscode_targets[@]}"; do
+        if [ -d "$target_dir" ] || [ -d "$(dirname "$target_dir")" ]; then
+            mkdir -p "$target_dir"
+            [ -f "$DOTFILES_DIR/vscode/settings.json" ] && safe_symlink "$DOTFILES_DIR/vscode/settings.json" "$target_dir/settings.json"
+            [ -f "$DOTFILES_DIR/vscode/keybindings.json" ] && safe_symlink "$DOTFILES_DIR/vscode/keybindings.json" "$target_dir/keybindings.json"
+            vscode_linked=1
         fi
-        
-        # Remove existing file/symlink
-        rm -f "$target"
-        
-        # Create new symlink
-        ln -s "$source" "$target"
-        print_status "Linked $target → $source"
-    }
-    
-    # Shell configurations
-    safe_symlink "$SYNC_DOTFILES_DIR/shell/.zshrc" ~/.zshrc
-    safe_symlink "$SYNC_DOTFILES_DIR/shell/.zprofile" ~/.zprofile
-    
-    # If using bash instead of zsh
-    if [ -f "$SYNC_DOTFILES_DIR/shell/.bashrc" ]; then
-        safe_symlink "$SYNC_DOTFILES_DIR/shell/.bashrc" ~/.bashrc
+    done
+    [ "$vscode_linked" -eq 0 ] && print_warning "No VS Code user settings directory found; skipping VS Code symlinks."
+
+    if [ "$backup_dir_created" -eq 1 ]; then
+        print_status "Backups saved in: $backup_dir"
     fi
-    if [ -f "$SYNC_DOTFILES_DIR/shell/.bash_profile" ]; then
-        safe_symlink "$SYNC_DOTFILES_DIR/shell/.bash_profile" ~/.bash_profile
-    fi
-    
-    # Git configuration
-    safe_symlink "$SYNC_DOTFILES_DIR/git/.gitconfig" ~/.gitconfig
-    
-    # SSH config (NOT keys!)
-    mkdir -p ~/.ssh
-    chmod 700 ~/.ssh
-    safe_symlink "$SYNC_DOTFILES_DIR/ssh/config" ~/.ssh/config
-    chmod 600 ~/.ssh/config
-    
-    # VS Code settings (Linux path)
-    if [ -d ~/.config/Code ]; then
-        mkdir -p ~/.config/Code/User
-        safe_symlink "$SYNC_DOTFILES_DIR/vscode/settings.json" ~/.config/Code/User/settings.json
-        
-        if [ -f "$SYNC_DOTFILES_DIR/vscode/keybindings.json" ]; then
-            safe_symlink "$SYNC_DOTFILES_DIR/vscode/keybindings.json" ~/.config/Code/User/keybindings.json
-        fi
-    fi
-    
-    print_status "Symlinks created successfully"
+    print_status "Symlinks processed"
 }
 
-# Setup Syncthing as a user service
 setup_syncthing_service() {
-    print_status "Setting up Syncthing as a user service..."
-    
-    # Enable and start Syncthing for current user
-    systemctl --user enable syncthing.service
-    systemctl --user start syncthing.service
-    
-    print_status "Syncthing service is running"
-    print_status "Web UI will be available at: http://localhost:8384"
+    print_status "Setting up Syncthing user service..."
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        print_warning "systemctl not available; skipping service setup."
+        return 0
+    fi
+
+    systemctl --user enable --now syncthing.service
+    print_status "Syncthing user service is enabled and running"
+    print_status "Web UI: http://localhost:8384"
 }
 
-# Install additional tools mentioned in .zshrc
 install_additional_tools() {
-    print_status "Installing additional tools for enhanced shell experience..."
-    
-    case $ID in
+    print_status "Installing additional CLI tools..."
+
+    case "$DISTRO_ID" in
         ubuntu|debian)
-            # Core tools
-            sudo apt-get install -y \
-                git \
-                curl \
-                wget \
-                htop \
-                tmux \
-                build-essential
-            
-            # Modern CLI replacements if available
-            which eza &>/dev/null || {
-                print_status "Installing eza (modern ls)..."
+            sudo apt-get update
+            sudo apt-get install -y git curl wget htop tmux build-essential
+
+            command -v eza >/dev/null 2>&1 || {
+                print_status "Installing eza..."
                 sudo apt-get install -y gpg
                 sudo mkdir -p /usr/share/keyrings
                 wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /usr/share/keyrings/eza-community.gpg
-                echo "deb [signed-by=/usr/share/keyrings/eza-community.gpg] http://deb.eza.community stable main" | sudo tee /etc/apt/sources.list.d/eza-community.list
+                echo "deb [signed-by=/usr/share/keyrings/eza-community.gpg] http://deb.eza.community stable main" | sudo tee /etc/apt/sources.list.d/eza-community.list >/dev/null
                 sudo apt-get update
                 sudo apt-get install -y eza
             }
-            
-            which bat &>/dev/null || sudo apt-get install -y bat
-            which rg &>/dev/null || sudo apt-get install -y ripgrep
-            which fd &>/dev/null || sudo apt-get install -y fd-find
-            which fzf &>/dev/null || sudo apt-get install -y fzf
-            which zoxide &>/dev/null || {
+            command -v bat >/dev/null 2>&1 || sudo apt-get install -y bat
+            command -v rg >/dev/null 2>&1 || sudo apt-get install -y ripgrep
+            command -v fd >/dev/null 2>&1 || sudo apt-get install -y fd-find
+            command -v fzf >/dev/null 2>&1 || sudo apt-get install -y fzf
+            command -v zoxide >/dev/null 2>&1 || {
                 print_status "Installing zoxide..."
-                curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+                curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
             }
             ;;
-            
+
         fedora|rhel|centos)
-            sudo dnf install -y \
-                git \
-                curl \
-                wget \
-                htop \
-                tmux \
-                gcc \
-                make
-                
-            # Modern tools
-            which eza &>/dev/null || sudo dnf install -y eza
-            which bat &>/dev/null || sudo dnf install -y bat
-            which rg &>/dev/null || sudo dnf install -y ripgrep
-            which fd &>/dev/null || sudo dnf install -y fd-find
-            which fzf &>/dev/null || sudo dnf install -y fzf
+            sudo dnf install -y git curl wget htop tmux gcc make
+            command -v eza >/dev/null 2>&1 || sudo dnf install -y eza
+            command -v bat >/dev/null 2>&1 || sudo dnf install -y bat
+            command -v rg >/dev/null 2>&1 || sudo dnf install -y ripgrep
+            command -v fd >/dev/null 2>&1 || sudo dnf install -y fd-find
+            command -v fzf >/dev/null 2>&1 || sudo dnf install -y fzf
+            command -v zoxide >/dev/null 2>&1 || sudo dnf install -y zoxide
             ;;
-            
-        arch|manjaro)
-            sudo pacman -S --noconfirm \
+
+        arch|manjaro|cachyos)
+            sudo pacman -S --needed --noconfirm \
                 git \
                 curl \
                 wget \
@@ -233,74 +348,65 @@ install_additional_tools() {
                 fzf \
                 zoxide
             ;;
+
+        *)
+            print_warning "Skipping additional tools: unsupported distro ID '$DISTRO_ID'"
+            ;;
     esac
-    
-    print_status "Additional tools installed"
+
+    print_status "Additional tools step complete"
 }
 
-# Main installation flow
 main() {
+    parse_args "$@"
+
     print_status "Starting Syncthing dotfiles bootstrap for Linux"
-    print_status "Expected synced repository path: $SYNC_DOTFILES_DIR"
-    echo ""
-    
-    # Detect distribution
     detect_distro
-    print_status "Detected: $OS ($ID)"
+    validate_paths
+
+    print_status "Detected: $OS ($DISTRO_ID)"
+    print_status "Dotfiles source: $DOTFILES_DIR"
+    print_status "Sync base: $SYNC_BASE"
     echo ""
-    
-    # Check if Syncthing is already installed
-    if command -v syncthing &>/dev/null; then
-        print_warning "Syncthing is already installed"
+
+    if command -v syncthing >/dev/null 2>&1; then
+        print_status "Syncthing already installed"
     else
         install_syncthing
     fi
     echo ""
-    
-    # Setup directories
-    setup_directories
-    echo ""
-    
-    # Note about syncing
-    print_warning "IMPORTANT: Before creating symlinks, you need to:"
-    print_warning "1. Start Syncthing and access the web UI at http://localhost:8384"
-    print_warning "2. Add this device to your Syncthing network from your primary machine"
-    print_warning "3. Accept the shared homesync folder and ensure syncthing-dotfiles is present"
-    print_warning "4. Wait for initial sync to complete"
-    echo ""
-    
-    read -p "Have you completed the Syncthing setup and initial sync? (y/n): " -n 1 -r
-    echo ""
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        # Create symlinks
+
+    if [ "$SKIP_SYNC_CHECK" -eq 0 ]; then
+        print_warning "Before symlinking, ensure this device has finished initial Syncthing folder sync."
+        if ! check_required_dotfiles; then
+            if ! prompt_yes_no "Required files are missing. Continue anyway?"; then
+                print_warning "Exiting. Re-run after sync completes."
+                exit 0
+            fi
+        fi
+    fi
+
+    if prompt_yes_no "Create/update dotfile symlinks now?" "y"; then
         create_symlinks
-        echo ""
-        
-        # Setup service
-        setup_syncthing_service
-        echo ""
-        
-        # Optional: Install additional tools
-        read -p "Do you want to install additional CLI tools (eza, bat, ripgrep, etc.)? (y/n): " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+    else
+        print_warning "Skipped symlink creation by request."
+    fi
+    echo ""
+
+    setup_syncthing_service
+    echo ""
+
+    if [ "$SKIP_TOOLS" -eq 1 ]; then
+        print_status "Skipping optional tool installation (--skip-tools)."
+    else
+        if prompt_yes_no "Install additional CLI tools (eza, bat, ripgrep, etc.)?"; then
             install_additional_tools
         fi
-        
-        print_status "Bootstrap complete!"
-        print_status "Your dotfiles are now synced via Syncthing"
-        print_status "Any changes will automatically sync across devices"
-        echo ""
-        print_warning "Remember to reload your shell configuration:"
-        print_warning "  source ~/.zshrc  (for zsh)"
-        print_warning "  source ~/.bashrc (for bash)"
-    else
-        print_warning "Please complete Syncthing setup first, then run this script again"
-        print_warning "You can manually start Syncthing with: syncthing"
-        exit 0
     fi
+    echo ""
+
+    print_status "Bootstrap complete"
+    print_status "Reload shell config if needed: source ~/.zshrc (or open a new terminal)"
 }
 
-# Run main function
 main "$@"
