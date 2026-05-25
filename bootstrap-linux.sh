@@ -136,7 +136,7 @@ validate_paths() {
     fi
 
     mkdir -p "$SYNC_BASE/dotfiles"
-    mkdir -p "$SYNC_BASE/dotfiles"/{shell,git,ssh,vscode,config}
+    mkdir -p "$SYNC_BASE/dotfiles"/{shell,git,ssh,vscode,config,tmux}
 }
 
 install_syncthing() {
@@ -253,6 +253,7 @@ create_symlinks() {
 
     [ -f "$DOTFILES_DIR/shell/.bashrc" ] && safe_symlink "$DOTFILES_DIR/shell/.bashrc" "$HOME/.bashrc"
     [ -f "$DOTFILES_DIR/shell/.bash_profile" ] && safe_symlink "$DOTFILES_DIR/shell/.bash_profile" "$HOME/.bash_profile"
+    [ -f "$DOTFILES_DIR/tmux/.tmux.conf" ] && safe_symlink "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
 
     safe_symlink "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 
