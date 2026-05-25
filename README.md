@@ -1,4 +1,5 @@
 # Syncthing Dotfiles Configuration
+
 ## Author: Matthew Beatty
 
 This directory contains synchronized dotfiles managed through Syncthing for consistent configuration across Mac and Linux devices.
@@ -17,7 +18,8 @@ This directory contains synchronized dotfiles managed through Syncthing for cons
 
 ## Synced Files
 
-- **Shell**: `.zshrc`, `.zprofile` 
+- **Shell**: `.zshrc`, `.zprofile`
+- **Tmux**: `.tmux.conf`
 - **Git**: `.gitconfig`
 - **SSH**: `config` (client configuration only)
 - **VS Code**: `settings.json`
@@ -39,6 +41,7 @@ This directory contains synchronized dotfiles managed through Syncthing for cons
 ## Setting Up on Mac
 
 Already configured! The symlinks are:
+
 - `~/.zshrc` → `~/dev/homesync/syncthing-dotfiles/shell/.zshrc`
 - `~/.zprofile` → `~/dev/homesync/syncthing-dotfiles/shell/.zprofile`
 - `~/.gitconfig` → `~/dev/homesync/syncthing-dotfiles/git/.gitconfig`
@@ -47,6 +50,7 @@ Already configured! The symlinks are:
 ## Security Notes
 
 ⚠️ **NEVER sync**:
+
 - Private SSH keys (`id_rsa`, `id_ed25519`, etc.)
 - GPG private keys
 - API tokens or secrets
@@ -85,9 +89,9 @@ ls -la ~/.zshrc ~/.gitconfig
 ## Additional Files to Consider Syncing
 
 You might want to add:
-- `.tmux.conf` - Terminal multiplexer config
-- `.config/htop/` - System monitor config  
+
+- `.config/htop/` - System monitor config
 - `.config/starship.toml` - Shell prompt theme
 - `.aliases` - Custom command aliases
 - `.functions` - Custom shell functions
-Simply copy them to the appropriate folder in `~/dev/homesync/syncthing-dotfiles/` and create symlinks.
+  Simply copy them to the appropriate folder in `~/dev/homesync/syncthing-dotfiles/` and create symlinks.

@@ -1,71 +1,68 @@
 {
-    "projectManager.git.baseFolders": [
-        "",
-        "/Volumes/mm2ssd/dev"
+  "projectManager.git.baseFolders": ["", "/Volumes/mm2ssd/dev"],
+  "yaml.schemas": {
+    "file:///Users/mjb/.vscode/extensions/continue.continue-1.2.14-darwin-arm64/config-yaml-schema.json": [
+      ".continue/**/*.yaml"
     ],
-    "yaml.schemas": {
-        "file:///Users/mjb/.vscode/extensions/continue.continue-1.2.14-darwin-arm64/config-yaml-schema.json": [
-            ".continue/**/*.yaml"
-        ],
-        "file:///c%3A/Users/SZ44Q0/.vscode/extensions/continue.continue-1.2.14-win32-x64/config-yaml-schema.json": [
-            ".continue/**/*.yaml"
-        ],
-        "file:///Users/mjb/.vscode/extensions/continue.continue-1.2.15-darwin-arm64/config-yaml-schema.json": [
-            ".continue/**/*.yaml"
-        ],
-        "file:///Users/mjb/.vscode/extensions/continue.continue-1.2.16-darwin-arm64/config-yaml-schema.json": [
-            ".continue/**/*.yaml"
-        ],
-        "file:///home/mjb/.vscode/extensions/continue.continue-1.2.22-linux-x64/config-yaml-schema.json": [
-            ".continue/**/*.yaml"
-        ],
-        "file:///Volumes/mm2ssd/mjb/.vscode/extensions/continue.continue-1.2.22-darwin-arm64/config-yaml-schema.json": [
-            ".continue/**/*.yaml"
-        ]
-    },
-    "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
-    "geminicodeassist.codeGenerationPaneViewEnabled": true,
-    "geminicodeassist.verboseLogging": true,
-    "geminicodeassist.project": "llms-465414",
-    "githubPullRequests.pullBranch": "never",
-    "gitlens.ai.model": "vscode",
-    "gitlens.ai.vscode.model": "copilot:gpt-4.1",
-    "claudeCode.preferredLocation": "panel",
-    "chatgpt.followUpQueueMode": "steer",
-    "chatgpt.reviewDelivery": "inline",
-    "redhat.telemetry.enabled": true,
-    "chat.tools.terminal.autoApprove": {
-        "npx -y ajv-cli": true
-    },
-    "http.systemCertificatesNode": true,
-    "chat.tools.urls.autoApprove": {
-        "https://code.visualstudio.com": true,
-        "https://github.com/microsoft/vscode/wiki/*": true,
-        "https://opencode.ai": {
-            "approveRequest": false,
-            "approveResponse": true
-        },
-        "https://github.com": {
-            "approveRequest": false,
-            "approveResponse": true
-        }
-    },
-    "json.schemaDownload.trustedDomains": {
-        "https://developer.microsoft.com/json-schemas/": true,
-        "https://json-schema.org/": true,
-        "https://json.schemastore.org/": true,
-        "https://models.dev": true,
-        "https://opencode.ai": true,
-        "https://raw.githubusercontent.com/devcontainers/spec/": true,
-        "https://raw.githubusercontent.com/microsoft/vscode/": true,
-        "https://schemastore.azurewebsites.net/": true,
-        "https://www.schemastore.org/": true
-    },
-    "git-autoconfig.configList": [
-        {
-            "user.email": "matt@beattyfamily.net",
-            "user.name": "mjbeatty89"
-        }
+    "file:///c%3A/Users/SZ44Q0/.vscode/extensions/continue.continue-1.2.14-win32-x64/config-yaml-schema.json": [
+      ".continue/**/*.yaml"
     ],
-    "git.openRepositoryInParentFolders": "always"
+    "file:///Users/mjb/.vscode/extensions/continue.continue-1.2.15-darwin-arm64/config-yaml-schema.json": [
+      ".continue/**/*.yaml"
+    ],
+    "file:///Users/mjb/.vscode/extensions/continue.continue-1.2.16-darwin-arm64/config-yaml-schema.json": [
+      ".continue/**/*.yaml"
+    ],
+    "file:///home/mjb/.vscode/extensions/continue.continue-1.2.22-linux-x64/config-yaml-schema.json": [
+      ".continue/**/*.yaml"
+    ],
+    "file:///Volumes/mm2ssd/mjb/.vscode/extensions/continue.continue-1.2.22-darwin-arm64/config-yaml-schema.json": [
+      ".continue/**/*.yaml"
+    ]
+  },
+  "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
+  "geminicodeassist.codeGenerationPaneViewEnabled": true,
+  "geminicodeassist.verboseLogging": true,
+  "geminicodeassist.project": "llms-465414",
+  "githubPullRequests.pullBranch": "never",
+  "gitlens.ai.model": "vscode",
+  "gitlens.ai.vscode.model": "copilot:gpt-4.1",
+  "claudeCode.preferredLocation": "panel",
+  "chatgpt.followUpQueueMode": "steer",
+  "chatgpt.reviewDelivery": "inline",
+  "redhat.telemetry.enabled": true,
+  "chat.tools.terminal.autoApprove": {
+    "npx -y ajv-cli": true
+  },
+  "http.systemCertificatesNode": true,
+  "chat.tools.urls.autoApprove": {
+    "https://code.visualstudio.com": true,
+    "https://github.com/microsoft/vscode/wiki/*": true,
+    "https://opencode.ai": {
+      "approveRequest": false,
+      "approveResponse": true
+    },
+    "https://github.com": {
+      "approveRequest": false,
+      "approveResponse": true
+    }
+  },
+  "json.schemaDownload.trustedDomains": {
+    "https://developer.microsoft.com/json-schemas/": true,
+    "https://json-schema.org/": true,
+    "https://json.schemastore.org/": true,
+    "https://models.dev": true,
+    "https://opencode.ai": true,
+    "https://raw.githubusercontent.com/devcontainers/spec/": true,
+    "https://raw.githubusercontent.com/microsoft/vscode/": true,
+    "https://schemastore.azurewebsites.net/": true,
+    "https://www.schemastore.org/": true
+  },
+  "git-autoconfig.configList": [
+    {
+      "user.email": "matt@beattyfamily.net",
+      "user.name": "mjbeatty89"
+    }
+  ],
+  "git.openRepositoryInParentFolders": "always"
 }

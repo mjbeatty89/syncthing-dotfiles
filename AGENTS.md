@@ -16,7 +16,9 @@ This repository manages dotfiles synchronized via Syncthing across macOS and Lin
 ## Development Tasks
 
 ### Validating Shell Configuration
+
 Before committing changes to shell scripts, verify syntax:
+
 ```bash
 zsh -n shell/.zshrc
 zsh -n shell/.zprofile
@@ -24,7 +26,9 @@ bash -n bootstrap-linux.sh
 ```
 
 ### Setting up a New Linux Device
+
 To verify the bootstrap process (dry run or actual):
+
 ```bash
 # Check script executable
 test -x bootstrap-linux.sh
@@ -34,9 +38,11 @@ test -x bootstrap-linux.sh
 ```
 
 ### Adding New Dotfiles
+
 1. Place the configuration file in the appropriate subdirectory (e.g., `config/app/`).
 2. Update `bootstrap-linux.sh` to include the symlink creation logic in the `create_symlinks` function.
 3. If the file contains secrets, ensure it is added to `.stignore` and `.gitignore`.
 
 ### Syncthing Exclusion
-The `.stignore` file controls which files Syncthing does *not* synchronize. Always check this file when adding new types of configuration to ensure secrets or large binaries are not synced.
+
+The `.stignore` file controls which files Syncthing does _not_ synchronize. Always check this file when adding new types of configuration to ensure secrets or large binaries are not synced.

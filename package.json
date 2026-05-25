@@ -1,0 +1,45 @@
+{
+  "name": "dotfiles",
+  "version": "1.0.0",
+  "description": "This directory contains synchronized dotfiles managed through Syncthing for consistent configuration across Mac and Linux devices.",
+  "scripts": {
+    "prepare": "husky",
+    "lint": "npm run lint:shell && npm run format:check && npm run lint:markdown",
+    "lint:shell": "zsh -n shell/.zshrc && zsh -n shell/.zprofile && bash -n bootstrap-linux.sh",
+    "lint:markdown": "markdownlint-cli2 \"**/*.md\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mjbeatty89/syncthing-dotfiles.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/mjbeatty89/syncthing-dotfiles/issues"
+  },
+  "homepage": "https://github.com/mjbeatty89/syncthing-dotfiles#readme",
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "markdownlint-cli2": "^0.18.1",
+    "prettier": "^3.6.2",
+    "prettier-plugin-sh": "^0.17.0"
+  },
+  "lint-staged": {
+    "*.{md,json,yml,yaml}": [
+      "prettier --write"
+    ],
+    "shell/*": [
+      "zsh -n shell/.zshrc",
+      "zsh -n shell/.zprofile"
+    ],
+    "bootstrap-linux.sh": [
+      "bash -n bootstrap-linux.sh"
+    ]
+  }
+}
