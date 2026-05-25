@@ -6,7 +6,7 @@ This directory contains synchronized dotfiles managed through Syncthing for cons
 
 ## Directory Structure
 
-```
+```text
 ~/dev/homesync/syncthing-dotfiles/
 ├── shell/          # Shell configurations (zsh/bash)
 ├── git/            # Git configuration
