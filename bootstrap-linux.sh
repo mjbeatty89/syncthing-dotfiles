@@ -1,12 +1,9 @@
 #!/bin/bash
 # Bootstrap script for setting up Syncthing and dotfiles on Linux devices
 # Author: Matthew Beatty
-# Usage: bash bootstrap-linux.sh [--yes] [--skip-tools] [--skip-sync-check] [--dotfiles-dir PATH] [--sync-base PATH]
+# Usage: bash bootstrap-linux.sh [--yes] [--skip-tools] [--skip-sync-check] [--dry-run] [--dotfiles-dir PATH] [--sync-base PATH]
 
 set -euo pipefail
-
-HOMESYNC_DIR="${HOMESYNC_DIR:-$HOME/dev/homesync}"
-SYNC_DOTFILES_DIR="${SYNC_DOTFILES_DIR:-$HOMESYNC_DIR/syncthing-dotfiles}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -23,17 +20,20 @@ else
     SYNC_BASE_DEFAULT="$HOME/Syncthing"
 fi
 SYNC_BASE="${SYNC_BASE:-$SYNC_BASE_DEFAULT}"
+SYNC_DOTFILES_DIR="${SYNC_DOTFILES_DIR:-$SYNC_BASE/dotfiles}"
 
 # Flags
 AUTO_YES=0
 SKIP_TOOLS=0
 SKIP_SYNC_CHECK=0
+DRY_RUN=0
 
 # Runtime globals
 OS=""
 DISTRO_ID=""
 backup_dir="$HOME/.dotfiles-backup-$(date +%Y%m%d-%H%M%S)"
 backup_dir_created=0
+ACTIVE_DOTFILES_DIR=""
 
 print_status() {
     echo -e "${GREEN}[INFO]${NC} $1"
@@ -47,6 +47,14 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+run_step() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        print_status "[dry-run] $*"
+    else
+        "$@"
+    fi
+}
+
 usage() {
     cat <<EOF
 Usage: bash bootstrap-linux.sh [OPTIONS]
@@ -55,12 +63,13 @@ Options:
   -y, --yes               Run non-interactively (assume yes for prompts)
       --skip-tools        Skip optional additional CLI tool installation
       --skip-sync-check   Skip required-file sync checks before creating symlinks
+      --dry-run           Show planned changes without modifying files or services
       --dotfiles-dir PATH Dotfiles source directory (default: script directory)
       --sync-base PATH    Syncthing root directory (default: \$HOME/homesync or \$HOME/Syncthing)
   -h, --help              Show this help
 
 Environment variable overrides:
-  DOTFILES_DIR, SYNC_BASE
+  DOTFILES_DIR, SYNC_BASE, SYNC_DOTFILES_DIR
 EOF
 }
 
@@ -75,6 +84,9 @@ parse_args() {
                 ;;
             --skip-sync-check)
                 SKIP_SYNC_CHECK=1
+                ;;
+            --dry-run)
+                DRY_RUN=1
                 ;;
             --dotfiles-dir)
                 DOTFILES_DIR="${2:-}"
@@ -134,12 +146,15 @@ validate_paths() {
         print_error "DOTFILES_DIR does not exist: $DOTFILES_DIR"
         exit 1
     fi
-
-    mkdir -p "$SYNC_BASE/dotfiles"
-    mkdir -p "$SYNC_BASE/dotfiles"/{shell,git,ssh,vscode,config,tmux}
+    run_step mkdir -p "$SYNC_DOTFILES_DIR"
+    run_step mkdir -p "$SYNC_DOTFILES_DIR"/{shell,git,ssh,vscode,config,tmux}
 }
 
 install_syncthing() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        print_status "[dry-run] Would install Syncthing for $OS ($DISTRO_ID)"
+        return 0
+    fi
     print_status "Installing Syncthing for $OS..."
 
     case "$DISTRO_ID" in
@@ -202,7 +217,7 @@ safe_symlink() {
 
     if [ -e "$target" ] || [ -L "$target" ]; then
         if [ "$backup_dir_created" -eq 0 ]; then
-            mkdir -p "$backup_dir"
+            run_step mkdir -p "$backup_dir"
             backup_dir_created=1
         fi
 
@@ -212,15 +227,20 @@ safe_symlink() {
         fi
 
         print_warning "Backing up existing $target to $backup_target"
-        mv "$target" "$backup_target"
+        run_step mv "$target" "$backup_target"
     fi
 
-    mkdir -p "$(dirname "$target")"
-    ln -s "$source" "$target"
-    print_status "Linked $target → $source"
+    run_step mkdir -p "$(dirname "$target")"
+    run_step ln -s "$source" "$target"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        print_status "[dry-run] Would link $target → $source"
+    else
+        print_status "Linked $target → $source"
+    fi
 }
 
-check_required_dotfiles() {
+check_required_dotfiles_in_dir() {
+    local dotfiles_root="$1"
     local missing=0
     local required_files=(
         "shell/.zshrc"
@@ -230,8 +250,8 @@ check_required_dotfiles() {
     )
 
     for relpath in "${required_files[@]}"; do
-        if [ ! -f "$DOTFILES_DIR/$relpath" ]; then
-            print_warning "Missing expected file: $DOTFILES_DIR/$relpath"
+        if [ ! -f "$dotfiles_root/$relpath" ]; then
+            print_warning "Missing expected file: $dotfiles_root/$relpath"
             missing=1
         fi
     done
@@ -239,28 +259,89 @@ check_required_dotfiles() {
     return "$missing"
 }
 
-create_symlinks() {
-    print_status "Creating symlinks from dotfiles source: $DOTFILES_DIR"
+seed_sync_dotfiles_if_needed() {
+    local source_root="$1"
+    local target_root="$SYNC_DOTFILES_DIR"
+    local managed_files=(
+        "shell/.zshenv"
+        "shell/.zshrc"
+        "shell/.zprofile"
+        "shell/.bashrc"
+        "shell/.bash_profile"
+        "tmux/.tmux.conf"
+        "git/.gitconfig"
+        "ssh/config"
+        "vscode/settings.json"
+        "vscode/keybindings.json"
+    )
 
-    mkdir -p "$HOME/.config/zsh"
+    [ "$source_root" = "$target_root" ] && return 0
+
+    for relpath in "${managed_files[@]}"; do
+        local source_path="$source_root/$relpath"
+        local target_path="$target_root/$relpath"
+
+        [ -f "$source_path" ] || continue
+        run_step mkdir -p "$(dirname "$target_path")"
+
+        if [ ! -e "$target_path" ] && [ ! -L "$target_path" ]; then
+            run_step cp -a "$source_path" "$target_path"
+            if [ "$DRY_RUN" -eq 1 ]; then
+                print_status "[dry-run] Would seed sync file: $target_path"
+            else
+                print_status "Seeded sync file: $target_path"
+            fi
+        elif [ -f "$target_path" ] && ! cmp -s "$source_path" "$target_path"; then
+            print_warning "Sync file differs (left unchanged): $target_path"
+        fi
+    done
+}
+
+resolve_active_dotfiles_dir() {
+    if check_required_dotfiles_in_dir "$DOTFILES_DIR"; then
+        ACTIVE_DOTFILES_DIR="$DOTFILES_DIR"
+        return 0
+    fi
+
+    print_warning "Primary dotfiles source is incomplete: $DOTFILES_DIR"
+    print_status "Trying sync source: $SYNC_DOTFILES_DIR"
+
+    if check_required_dotfiles_in_dir "$SYNC_DOTFILES_DIR"; then
+        ACTIVE_DOTFILES_DIR="$SYNC_DOTFILES_DIR"
+        print_status "Using sync source for symlinks: $ACTIVE_DOTFILES_DIR"
+        return 0
+    fi
+
+    return 1
+}
+
+create_symlinks() {
+    if [ -z "$ACTIVE_DOTFILES_DIR" ]; then
+        print_error "ACTIVE_DOTFILES_DIR is not set"
+        exit 1
+    fi
+
+    print_status "Creating symlinks from dotfiles source: $ACTIVE_DOTFILES_DIR"
+
+    run_step mkdir -p "$HOME/.config/zsh"
 
     # Minimal .zshenv in HOME to point to XDG config
-    safe_symlink "$DOTFILES_DIR/shell/.zshenv" "$HOME/.zshenv"
+    safe_symlink "$ACTIVE_DOTFILES_DIR/shell/.zshenv" "$HOME/.zshenv"
 
     # Actual zsh configurations in XDG location
-    safe_symlink "$DOTFILES_DIR/shell/.zshrc" "$HOME/.config/zsh/.zshrc"
-    safe_symlink "$DOTFILES_DIR/shell/.zprofile" "$HOME/.config/zsh/.zprofile"
+    safe_symlink "$ACTIVE_DOTFILES_DIR/shell/.zshrc" "$HOME/.config/zsh/.zshrc"
+    safe_symlink "$ACTIVE_DOTFILES_DIR/shell/.zprofile" "$HOME/.config/zsh/.zprofile"
 
-    [ -f "$DOTFILES_DIR/shell/.bashrc" ] && safe_symlink "$DOTFILES_DIR/shell/.bashrc" "$HOME/.bashrc"
-    [ -f "$DOTFILES_DIR/shell/.bash_profile" ] && safe_symlink "$DOTFILES_DIR/shell/.bash_profile" "$HOME/.bash_profile"
-    [ -f "$DOTFILES_DIR/tmux/.tmux.conf" ] && safe_symlink "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
+    [ -f "$ACTIVE_DOTFILES_DIR/shell/.bashrc" ] && safe_symlink "$ACTIVE_DOTFILES_DIR/shell/.bashrc" "$HOME/.bashrc"
+    [ -f "$ACTIVE_DOTFILES_DIR/shell/.bash_profile" ] && safe_symlink "$ACTIVE_DOTFILES_DIR/shell/.bash_profile" "$HOME/.bash_profile"
+    [ -f "$ACTIVE_DOTFILES_DIR/tmux/.tmux.conf" ] && safe_symlink "$ACTIVE_DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
 
-    safe_symlink "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
+    safe_symlink "$ACTIVE_DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 
-    mkdir -p "$HOME/.ssh"
-    chmod 700 "$HOME/.ssh"
-    safe_symlink "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
-    [ -L "$HOME/.ssh/config" ] || [ -f "$HOME/.ssh/config" ] && chmod 600 "$HOME/.ssh/config"
+    run_step mkdir -p "$HOME/.ssh"
+    run_step chmod 700 "$HOME/.ssh"
+    safe_symlink "$ACTIVE_DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
+    [ -L "$HOME/.ssh/config" ] || [ -f "$HOME/.ssh/config" ] && run_step chmod 600 "$HOME/.ssh/config"
 
     local vscode_targets=(
         "$HOME/.config/Code/User"
@@ -270,9 +351,9 @@ create_symlinks() {
     local vscode_linked=0
     for target_dir in "${vscode_targets[@]}"; do
         if [ -d "$target_dir" ] || [ -d "$(dirname "$target_dir")" ]; then
-            mkdir -p "$target_dir"
-            [ -f "$DOTFILES_DIR/vscode/settings.json" ] && safe_symlink "$DOTFILES_DIR/vscode/settings.json" "$target_dir/settings.json"
-            [ -f "$DOTFILES_DIR/vscode/keybindings.json" ] && safe_symlink "$DOTFILES_DIR/vscode/keybindings.json" "$target_dir/keybindings.json"
+            run_step mkdir -p "$target_dir"
+            [ -f "$ACTIVE_DOTFILES_DIR/vscode/settings.json" ] && safe_symlink "$ACTIVE_DOTFILES_DIR/vscode/settings.json" "$target_dir/settings.json"
+            [ -f "$ACTIVE_DOTFILES_DIR/vscode/keybindings.json" ] && safe_symlink "$ACTIVE_DOTFILES_DIR/vscode/keybindings.json" "$target_dir/keybindings.json"
             vscode_linked=1
         fi
     done
@@ -285,6 +366,10 @@ create_symlinks() {
 }
 
 setup_syncthing_service() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        print_status "[dry-run] Would enable/start syncthing.service for user"
+        return 0
+    fi
     print_status "Setting up Syncthing user service..."
 
     if ! command -v systemctl >/dev/null 2>&1; then
@@ -298,6 +383,10 @@ setup_syncthing_service() {
 }
 
 install_additional_tools() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        print_status "[dry-run] Would install optional CLI tools for $DISTRO_ID"
+        return 0
+    fi
     print_status "Installing additional CLI tools..."
 
     case "$DISTRO_ID" in
@@ -368,6 +457,8 @@ main() {
     print_status "Detected: $OS ($DISTRO_ID)"
     print_status "Dotfiles source: $DOTFILES_DIR"
     print_status "Sync base: $SYNC_BASE"
+    print_status "Sync dotfiles dir: $SYNC_DOTFILES_DIR"
+    [ "$DRY_RUN" -eq 1 ] && print_status "Mode: dry-run (no filesystem/service/package changes)"
     echo ""
 
     if command -v syncthing >/dev/null 2>&1; then
@@ -379,13 +470,21 @@ main() {
 
     if [ "$SKIP_SYNC_CHECK" -eq 0 ]; then
         print_warning "Before symlinking, ensure this device has finished initial Syncthing folder sync."
-        if ! check_required_dotfiles; then
+        if ! resolve_active_dotfiles_dir; then
             if ! prompt_yes_no "Required files are missing. Continue anyway?"; then
                 print_warning "Exiting. Re-run after sync completes."
                 exit 0
             fi
+            ACTIVE_DOTFILES_DIR="$DOTFILES_DIR"
         fi
+    else
+        ACTIVE_DOTFILES_DIR="$DOTFILES_DIR"
     fi
+
+    if [ -z "$ACTIVE_DOTFILES_DIR" ]; then
+        ACTIVE_DOTFILES_DIR="$DOTFILES_DIR"
+    fi
+    seed_sync_dotfiles_if_needed "$ACTIVE_DOTFILES_DIR"
 
     if prompt_yes_no "Create/update dotfile symlinks now?" "y"; then
         create_symlinks
