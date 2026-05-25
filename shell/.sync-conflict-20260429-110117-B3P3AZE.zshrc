@@ -2,9 +2,6 @@
 # ZSH Configuration - Multi-OS Support
 # Matthew Beatty - mjbeatty89@gmail.com
 # ============================================================================
-# XDG base directory variables (XDG_CONFIG_HOME, XDG_DATA_HOME, etc.)
-# are declared in .zshenv, which is sourced before this file.
-# ============================================================================
 
 # ============================================================================
 # OS Detection
@@ -27,78 +24,24 @@ esac
 # ============================================================================
 # PATH Configuration
 # ============================================================================
-# Use zsh's path array for reliable ordering and automatic deduplication
-typeset -U path
 
-path_prepend() { [[ -d "$1" ]] && path=("$1" $path); }
-path_append() { [[ -d "$1" ]] && path+=("$1"); }
-
-# User-local bins first
-path_prepend "$HOME/.local/bin"
-path_prepend "$HOME/.cargo/bin"
-path_prepend "$HOME/.bun/bin"
-path_prepend "$HOME/.opencode/bin"
-path_prepend "$HOME/.antigravity/antigravity/bin"
-path_prepend "$HOME/.atuin/bin"
-path_prepend "/opt/homebrew/bin"
-path_prepend "/opt/homebrew/sbin"
-
-# Package-manager / tool bins
+# OS-specific PATH additions
 if [ "$OS_TYPE" = "mac" ]; then
-    path_prepend "$HOME/Library/pnpm"
-else
-    path_prepend "$XDG_DATA_HOME/pnpm"
+    # LM Studio CLI (macOS only)
+    [ -d "$HOME/.lmstudio/bin" ] && export PATH="$PATH:$HOME/.lmstudio/bin"
 fi
-path_append "$HOME/.docker/bin"
-path_append "$HOME/.lmstudio/bin"
-path_append "/Volumes/mm2ssd/mjb/.lmstudio/bin"
-path_append "/Applications/Obsidian.app/Contents/MacOS"
-path_append "$HOME/mlx-env/bin"  # MLX local AI
 
-export PATH
+if [ "$OS_TYPE" = "linux" ]; then
+    # Add common Linux paths
+    [ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
+fi
 
-# ============================================================================
-# XDG-Aware Tool Configuration
-# ============================================================================
-# XDG vars are declared in .zshenv. Here we redirect individual tools
-# so they stop scattering files across $HOME.
-
-# Zsh history → XDG state (persistent runtime state, not config)
-mkdir -p "$XDG_STATE_HOME/zsh"
-
-# Less — move .lesshst out of home
-export LESSHISTFILE="$XDG_STATE_HOME/less/history"
-mkdir -p "$XDG_STATE_HOME/less"
-
-# SQLite — move .sqlite_history out of home
-export SQLITE_HISTORY="$XDG_STATE_HOME/sqlite/history"
-mkdir -p "$XDG_STATE_HOME/sqlite"
-
-# npm — cache to XDG_CACHE, config to XDG_CONFIG
-export NPM_CONFIG_CACHE="$XDG_CACHE_HOME/npm"
-export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME/npm/npmrc"
-mkdir -p "$XDG_CACHE_HOME/npm" "$XDG_CONFIG_HOME/npm"
-
-# wget — keep .wget-hsts out of home
-export WGETRC="$XDG_CONFIG_HOME/wget/wgetrc"
-mkdir -p "$XDG_CONFIG_HOME/wget"
-[[ ! -f "$WGETRC" ]] && echo "hsts-file = $XDG_CACHE_HOME/wget-hsts" > "$WGETRC"
-
-# Python — history and startup config
-# PYTHON_HISTORY requires Python 3.13+; PYTHONSTARTUP works on all versions
-export PYTHONDONTWRITEBYTECODE=1
-export PYTHON_HISTORY="$XDG_STATE_HOME/python/history"
-export PYTHONSTARTUP="$XDG_CONFIG_HOME/python/pythonstartup.py"
-mkdir -p "$XDG_STATE_HOME/python" "$XDG_CONFIG_HOME/python"
-
-# Ansible — your homelab playbooks will pick this up automatically
-export ANSIBLE_HOME="$XDG_CONFIG_HOME/ansible"
-export ANSIBLE_CONFIG="$XDG_CONFIG_HOME/ansible/ansible.cfg"
-export ANSIBLE_GALAXY_CACHE_DIR="$XDG_CACHE_HOME/ansible/galaxy"
-
-# Zoxide — jump database lives in XDG data
-export _ZO_DATA_DIR="$XDG_DATA_HOME/zoxide"
-mkdir -p "$_ZO_DATA_DIR"
+# Linux: source local credentials (populated from 1Password)
+# ~/.env.tokens contains: GH_TOKEN=<github_pat>
+# gh CLI reads GH_TOKEN automatically; git uses it via credential helper
+if [ "$OS_TYPE" = "linux" ]; then
+    [[ -f ~/.env.tokens ]] && source ~/.env.tokens
+fi
 
 # ============================================================================
 # API Keys and Secrets
@@ -106,6 +49,11 @@ mkdir -p "$_ZO_DATA_DIR"
 # 1Password Environments (Local .env)
 # We avoid exporting secrets at login. Instead, 1Password Desktop mounts a local
 # .env at $HOME/.env.ai. Use the 'withai' helper to run commands with those vars.
+
+# Disable legacy secrets sourcing
+# if [ -f ~/.zshrc.secrets ]; then
+#     source ~/.zshrc.secrets
+# fi
 
 # Path to the 1Password Environments mounted .env file
 export OP_ENV_AI="$HOME/.env.ai"
@@ -115,7 +63,7 @@ if command -v dotenvx &> /dev/null; then
     alias withai='dotenvx run -f "$OP_ENV_AI" --'
 else
     withai() {
-        echo "Install dotenvx first: https://github.com/dotenvx/dotenvx#installation" >&2
+        echo "Install dotenvx first: brew install dotenvx" >&2
         return 1
     }
 fi
@@ -129,7 +77,7 @@ alias ai-curl='withai curl'
 # ============================================================================
 # History Configuration
 # ============================================================================
-HISTFILE="$XDG_STATE_HOME/zsh/history"   # XDG state (dir created above)
+HISTFILE=~/.zsh_history
 HISTSIZE=50000
 SAVEHIST=50000
 setopt EXTENDED_HISTORY          # Write timestamp to history file
@@ -150,14 +98,8 @@ setopt PUSHD_SILENT              # Don't print directory stack after pushd/popd
 # ============================================================================
 # Completion System
 # ============================================================================
-# Docker and other tools add their completions to fpath — do this BEFORE compinit
-fpath=($HOME/.docker/completions $fpath)
-
 autoload -Uz compinit
-
-# Store the completion dump in XDG cache (versioned so stale dumps auto-refresh)
-mkdir -p "$XDG_CACHE_HOME/zsh"
-compinit -d "$XDG_CACHE_HOME/zsh/zcompdump-$ZSH_VERSION"
+compinit
 
 # Case-insensitive completion
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
@@ -184,19 +126,8 @@ zstyle ':completion:*:match:*' original only
 zstyle ':completion:*:approximate:*' max-errors 1 numeric
 
 # ============================================================================
-# ZSH Autocomplete (oh-my-zsh)
+# ZSH Autocomplete
 # ============================================================================
-# oh-my-zsh is installed at $HOME/.oh-my-zsh by its installer.
-# To move it to XDG ($XDG_DATA_HOME/oh-my-zsh), reinstall with:
-#   ZSH="$XDG_DATA_HOME/oh-my-zsh" sh -c "$(curl -fsSL https://install.ohmyz.sh)"
-export ZSH="$HOME/.oh-my-zsh"
-ZSH_THEME=""
-plugins=()
-
-if [ -f "$ZSH/oh-my-zsh.sh" ]; then
-    source "$ZSH/oh-my-zsh.sh"
-fi
-
 # Load zsh-autocomplete from OS-specific location
 if [ "$OS_TYPE" = "mac" ] && [ -f "/opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]; then
     source /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
@@ -204,8 +135,6 @@ elif [ "$OS_TYPE" = "linux" ]; then
     # Try common Linux locations
     if [ -f "/usr/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]; then
         source /usr/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
-    elif [ -f "$XDG_DATA_HOME/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]; then
-        source "$XDG_DATA_HOME/zsh-autocomplete/zsh-autocomplete.plugin.zsh"
     elif [ -f "$HOME/.zsh/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]; then
         source $HOME/.zsh/zsh-autocomplete/zsh-autocomplete.plugin.zsh
     fi
@@ -220,10 +149,9 @@ zstyle ':autocomplete:*' min-delay 0.05  # seconds (float)
 # ============================================================================
 export CLICOLOR=1
 export LSCOLORS=GxFxCxDxBxegedabagaced
-# Enable colored output for grep (without deprecated GREP_OPTIONS)
-if ! command -v rg &> /dev/null; then
-    alias grep='grep --color=auto'
-fi
+
+# Enable colored output for grep
+export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='1;32'
 
 # ============================================================================
@@ -262,14 +190,14 @@ fi
 if command -v fzf &> /dev/null; then
     # Set up fzf key bindings and fuzzy completion
     source <(fzf --zsh)
-
+    
     # Use fd for fzf if available
     if command -v fd &> /dev/null; then
         export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
         export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
         export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
     fi
-
+    
     # Color scheme for fzf
     export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --inline-info \
         --color=fg:#d0d0d0,bg:#121212,hl:#5f87af \
@@ -281,19 +209,165 @@ fi
 # ============================================================================
 # Zoxide - Smarter cd
 # ============================================================================
-# _ZO_DATA_DIR is set above in the XDG section.
-# '--cmd cd' replaces the built-in cd with zoxide's smarter version.
-# You still get 'z' and 'zi' as shorthand aliases.
 if command -v zoxide &> /dev/null; then
+    # Use '--cmd cd' to tell zoxide to replace the cd command natively
     eval "$(zoxide init zsh --cmd cd)"
 fi
-
 # ============================================================================
 # TheFuck - Correct Previous Command
 # ============================================================================
+# shellcheck shell=bash
+
+# =============================================================================
+#
+# Utility functions for zoxide.
+#
+
+# pwd based on the value of _ZO_RESOLVE_SYMLINKS.
+function __zoxide_pwd() {
+    \builtin pwd -L
+}
+
+# cd + custom logic based on the value of _ZO_ECHO.
+function __zoxide_cd() {
+    # shellcheck disable=SC2164
+    \builtin cd -- "$@"
+}
+
+# =============================================================================
+#
+# Hook configuration for zoxide.
+#
+
+# Hook to add new entries to the database.
+function __zoxide_hook() {
+    # shellcheck disable=SC2312
+    \command zoxide add -- "$(__zoxide_pwd)"
+}
+
+# Initialize hook.
+\builtin typeset -ga precmd_functions
+\builtin typeset -ga chpwd_functions
+# shellcheck disable=SC2034,SC2296
+precmd_functions=("${(@)precmd_functions:#__zoxide_hook}")
+# shellcheck disable=SC2034,SC2296
+chpwd_functions=("${(@)chpwd_functions:#__zoxide_hook}")
+chpwd_functions+=(__zoxide_hook)
+
+# Report common issues.
+function __zoxide_doctor() {
+    [[ ${_ZO_DOCTOR:-1} -ne 0 ]] || return 0
+    [[ ${chpwd_functions[(Ie)__zoxide_hook]:-} -eq 0 ]] || return 0
+
+    _ZO_DOCTOR=0
+    \builtin printf '%s\n' \
+        'zoxide: detected a possible configuration issue.' \
+        'Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).' \
+        '' \
+        'If the issue persists, consider filing an issue at:' \
+        'https://github.com/ajeetdsouza/zoxide/issues' \
+        '' \
+        'Disable this message by setting _ZO_DOCTOR=0.' \
+        '' >&2
+}
+
+# =============================================================================
+#
+# When using zoxide with --no-cmd, alias these internal functions as desired.
+#
+
+# Jump to a directory using only keywords.
+function __zoxide_z() {
+    __zoxide_doctor
+    if [[ "$#" -eq 0 ]]; then
+        __zoxide_cd ~
+    elif [[ "$#" -eq 1 ]] && { [[ -d "$1" ]] || [[ "$1" = '-' ]] || [[ "$1" =~ ^[-+][0-9]$ ]]; }; then
+        __zoxide_cd "$1"
+    elif [[ "$#" -eq 2 ]] && [[ "$1" = "--" ]]; then
+        __zoxide_cd "$2"
+    else
+        \builtin local result
+        # shellcheck disable=SC2312
+        result="$(\command zoxide query --exclude "$(__zoxide_pwd)" -- "$@")" && __zoxide_cd "${result}"
+    fi
+}
+
+# Jump to a directory using interactive search.
+function __zoxide_zi() {
+    __zoxide_doctor
+    \builtin local result
+    result="$(\command zoxide query --interactive -- "$@")" && __zoxide_cd "${result}"
+}
+
+# =============================================================================
+#
+# Commands for zoxide. Disable these using --no-cmd.
+#
+
+function z() {
+    __zoxide_z "$@"
+}
+
+function zi() {
+    __zoxide_zi "$@"
+}
+
+# Completions.
+if [[ -o zle ]]; then
+    __zoxide_result=''
+
+    function __zoxide_z_complete() {
+        # Only show completions when the cursor is at the end of the line.
+        # shellcheck disable=SC2154
+        [[ "${#words[@]}" -eq "${CURRENT}" ]] || return 0
+
+        if [[ "${#words[@]}" -eq 2 ]]; then
+            # Show completions for local directories.
+            _cd -/
+
+        elif [[ "${words[-1]}" == '' ]]; then
+            # Show completions for Space-Tab.
+            # shellcheck disable=SC2086
+            __zoxide_result="$(\command zoxide query --exclude "$(__zoxide_pwd || \builtin true)" --interactive -- ${words[2,-1]})" || __zoxide_result=''
+
+            # Set a result to ensure completion doesn't re-run
+            compadd -Q ""
+
+            # Bind '\e[0n' to helper function.
+            \builtin bindkey '\e[0n' '__zoxide_z_complete_helper'
+            # Sends query device status code, which results in a '\e[0n' being sent to console input.
+            \builtin printf '\e[5n'
+
+            # Report that the completion was successful, so that we don't fall back
+            # to another completion function.
+            return 0
+        fi
+    }
+
+    function __zoxide_z_complete_helper() {
+        if [[ -n "${__zoxide_result}" ]]; then
+            # shellcheck disable=SC2034,SC2296
+            BUFFER="z ${(q-)__zoxide_result}"
+            __zoxide_result=''
+            \builtin zle reset-prompt
+            \builtin zle accept-line
+        else
+            \builtin zle reset-prompt
+        fi
+    }
+    \builtin zle -N __zoxide_z_complete_helper
+
+    [[ "${+functions[compdef]}" -ne 0 ]] && \compdef __zoxide_z_complete z
+fi
+
+# =============================================================================
+#
+# To initialize zoxide, add this to your shell configuration file (usually ~/.zshrc):
+#
+# eval "$(zoxide init zsh)"
 if command -v thefuck &> /dev/null; then
-    eval "$(thefuck --alias)"
-    eval "$(thefuck --alias fk)"  # Shorter alias
+    eval $(thefuck --alias)
+    eval $(thefuck --alias fk)  # Shorter alias
 fi
 
 # ============================================================================
@@ -315,12 +389,6 @@ alias glog='git log --oneline --graph --decorate --all'
 # ============================================================================
 # Development Aliases
 # ============================================================================
-# Terminal editor
-if command -v subl &> /dev/null; then
-    export EDITOR='subl -w'
-    export VISUAL='subl -w'
-    export GIT_EDITOR='subl -w'
-fi
 
 # Python
 alias py='python3'
@@ -332,9 +400,9 @@ alias m='make'
 
 # VSCode (OS-specific)
 if [ "$OS_TYPE" = "mac" ]; then
-    alias code='/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code'
+    alias code='/Applications/Visual\\ Studio\\ Code.app/Contents/Resources/app/bin/code'
 elif [ "$OS_TYPE" = "linux" ]; then
-    # Linux — usually already in PATH
+    # Linux - usually already in PATH
     command -v code &>/dev/null || alias code='code'
 fi
 
@@ -360,26 +428,12 @@ fi
 alias ports='lsof -i -P | grep LISTEN'
 
 # SSH Shortcuts
+alias ssh-check='~/.ssh/check-hosts.sh'
 alias ssh-config='${EDITOR:-nano} ~/.ssh/config'
-if [ -x "$HOME/.ssh/check-hosts.sh" ]; then
-    alias ssh-check="$HOME/.ssh/check-hosts.sh"
-elif [ -x "$HOME/dev/homesync/ssh-config/check-hosts.sh" ]; then
-    alias ssh-check="$HOME/dev/homesync/ssh-config/check-hosts.sh"
-fi
+alias ssh-backup='cd ~/.ssh && git status && git log --oneline -5'
+alias rpi-bootstrap='~/.ssh/bootstrap-rpi.sh'
 
-if [ -d "$HOME/dev/homesync/ssh-config/.git" ]; then
-    alias ssh-backup="cd $HOME/dev/homesync/ssh-config && git --no-pager status && git --no-pager log --oneline -5"
-else
-    alias ssh-backup='cd ~/.ssh && git --no-pager status && git --no-pager log --oneline -5'
-fi
-
-if [ -x "$HOME/.ssh/bootstrap-rpi.sh" ]; then
-    alias rpi-bootstrap="$HOME/.ssh/bootstrap-rpi.sh"
-elif [ -x "$HOME/dev/homesync/ssh-config/bootstrap-rpi.sh" ]; then
-    alias rpi-bootstrap="$HOME/dev/homesync/ssh-config/bootstrap-rpi.sh"
-fi
-
-# Quick SSH to em0lab hosts
+# Quick SSH to primary servers
 alias sha='ssh ha'
 alias sfr='ssh frigate'
 alias swin='ssh winserv'
@@ -412,7 +466,7 @@ elif [ "$OS_TYPE" = "linux" ]; then
     if command -v dnf &>/dev/null; then
         alias dnfup='sudo dnf update -y && sudo dnf autoremove -y'
     fi
-    # Pacman (Arch / CachyOS)
+    # Pacman (Arch)
     if command -v pacman &>/dev/null; then
         alias pacup='sudo pacman -Syu'
         alias pacclean='sudo pacman -Sc'
@@ -422,23 +476,7 @@ fi
 # ============================================================================
 # QMK Keyboard Development
 # ============================================================================
-# qmk stores its firmware clone in XDG data
-export QMK_HOME="$XDG_DATA_HOME/qmk_firmware"
-
-# ============================================================================
-# Package Managers (pnpm, bun)
-# ============================================================================
-
-# pnpm — macOS uses ~/Library per Apple convention; Linux uses XDG data
-if [ "$OS_TYPE" = "mac" ]; then
-    export PNPM_HOME="$HOME/Library/pnpm"
-else
-    export PNPM_HOME="$XDG_DATA_HOME/pnpm"
-fi
-
-# bun
-export BUN_INSTALL="$HOME/.bun"
-[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
+export QMK_HOME="$HOME/qmk_firmware"
 
 # ============================================================================
 # Custom Functions
@@ -451,29 +489,29 @@ mkcd() {
 
 # Extract any archive
 extract() {
-    if [ -f "$1" ]; then
-        case "$1" in
-            *.tar.bz2)   tar xjf "$1"    ;;
-            *.tar.gz)    tar xzf "$1"    ;;
-            *.bz2)       bunzip2 "$1"    ;;
-            *.rar)       unrar e "$1"    ;;
-            *.gz)        gunzip "$1"     ;;
-            *.tar)       tar xf "$1"     ;;
-            *.tbz2)      tar xjf "$1"    ;;
-            *.tgz)       tar xzf "$1"    ;;
-            *.zip)       unzip "$1"      ;;
-            *.Z)         uncompress "$1" ;;
-            *.7z)        7z x "$1"       ;;
-            *)           echo "'$1' cannot be extracted via extract()" ;;
+    if [ -f $1 ]; then
+        case $1 in
+            *.tar.bz2)   tar xjf $1     ;;
+            *.tar.gz)    tar xzf $1     ;;
+            *.bz2)       bunzip2 $1     ;;
+            *.rar)       unrar e $1     ;;
+            *.gz)        gunzip $1      ;;
+            *.tar)       tar xf $1      ;;
+            *.tbz2)      tar xjf $1     ;;
+            *.tgz)       tar xzf $1     ;;
+            *.zip)       unzip $1       ;;
+            *.Z)         uncompress $1  ;;
+            *.7z)        7z x $1        ;;
+            *)     echo "'$1' cannot be extracted via extract()" ;;
         esac
     else
         echo "'$1' is not a valid file"
     fi
 }
 
-# Quick find (note: 'fd' alias above overrides the fd() function — rename to fdir)
+# Quick find file/directory
 ff() { find . -type f -name "*$1*"; }
-fdir() { find . -type d -name "*$1*"; }
+fd() { find . -type d -name "*$1*"; }
 
 # Git commit with message
 gcm() {
@@ -493,7 +531,6 @@ h() {
 # ============================================================================
 # Starship Prompt
 # ============================================================================
-# Starship reads $XDG_CONFIG_HOME/starship.toml automatically — no extra var needed.
 if command -v starship &> /dev/null; then
     eval "$(starship init zsh)"
 fi
@@ -501,10 +538,9 @@ fi
 # ============================================================================
 # Machine-Specific Configuration
 # ============================================================================
-# Load machine-specific config if it exists.
-# Looks in the dotfiles repo first, then falls back to a local-only path.
-CURRENT_HOST=$(hostname -s)
-MACHINE_CONFIG="$HOME/dotfiles/zsh/machines/${CURRENT_HOST}.zsh"
+# Load machine-specific config if it exists
+HOSTNAME=$(hostname -s)
+MACHINE_CONFIG="$HOME/dotfiles/zsh/machines/${HOSTNAME}.zsh"
 if [ -f "$MACHINE_CONFIG" ]; then
     source "$MACHINE_CONFIG"
 fi
@@ -512,75 +548,68 @@ fi
 # ============================================================================
 # 1Password CLI Plugin (Mac)
 # ============================================================================
-if [ "$OS_TYPE" = "mac" ] && [ -f "$XDG_CONFIG_HOME/op/plugins.sh" ]; then
-    source "$XDG_CONFIG_HOME/op/plugins.sh"
+if [ "$OS_TYPE" = "mac" ] && [ -f "$HOME/.config/op/plugins.sh" ]; then
+    source $HOME/.config/op/plugins.sh
 fi
-
-# ============================================================================
-# Other Tool Integrations
-# ============================================================================
-
-# broot — file navigator
-[ -f "$XDG_CONFIG_HOME/broot/launcher/bash/br" ] && source "$XDG_CONFIG_HOME/broot/launcher/bash/br"
-
-# langflow / uv
-[ -f "$HOME/.langflow/uv/env" ] && . "$HOME/.langflow/uv/env"
 
 # ============================================================================
 # Dotfiles Auto-Update Function
 # ============================================================================
 dotfiles-update() {
     echo "📦 Updating dotfiles..."
-    cd "$HOME/dotfiles" || return 1
+    cd $HOME/dotfiles || return 1
     git add -A
-    git commit -m "Update dotfiles from $(hostname -s) - $(date '+%Y-%m-%d %H:%M:%S')"
+    git commit -m "Update dotfiles from $(hostname) - $(date '+%Y-%m-%d %H:%M:%S')"
     git push
     echo "✅ Dotfiles updated and pushed to GitHub!"
     cd - > /dev/null
 }
 
 # ============================================================================
-# Shell Plugins (autosuggestions, syntax highlighting)
-# ============================================================================
-# Load after everything else so highlighting covers all aliases
-[ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
-    source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-[ -f /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
-    source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-
-# ============================================================================
 # Welcome Message
 # ============================================================================
-if command -v fastfetch &> /dev/null; then
-    fastfetch
-elif command -v neofetch &> /dev/null; then
-    neofetch
-fi
-
 if [ "$OS_TYPE" = "mac" ]; then
-    echo "🍎 macOS ($(hostname -s)) - Zsh ready."
+    echo "🍎 macOS ($(hostname -s)) - Welcome back, Matthew!"
 elif [ "$OS_TYPE" = "linux" ]; then
-    echo "🐧 Linux ($(hostname -s)) - Zsh ready."
+    echo "🐧 Linux ($(hostname -s)) - Welcome back, Matthew!"
 else
-    echo "💻 $(hostname -s) - Zsh ready."
+    echo "💻 $(hostname -s) - Welcome back, Matthew!"
 fi
+echo "💡 Tip: Use 'fuck' or 'fk' to correct the last command"
 
-# claude-mem alias (1Password / bun script)
-alias claude-mem='/Volumes/mm2ssd/mjb/.bun/bin/bun "/Volumes/mm2ssd/mjb/.claude/plugins/marketplaces/thedotmack/plugin/scripts/worker-service.cjs"'
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/mjb/.lmstudio/bin"
+# End of LM Studio CLI section
 
-[ -f "$HOME/.atuin/bin/env" ] && . "$HOME/.atuin/bin/env"
-
-if command -v atuin &> /dev/null; then
-    eval "$(atuin init zsh)"
-fi
 # The following lines have been added by Docker Desktop to enable Docker CLI completions.
-fpath=(/Volumes/mm2ssd/mjb/.docker/completions $fpath)
+fpath=(/Users/mjb/.docker/completions $fpath)
 autoload -Uz compinit
 compinit
 # End of Docker CLI completions
 
+source /Users/mjb/.config/broot/launcher/bash/br
+export PATH="$HOME/.local/bin:$PATH"
+
+# Added by Antigravity
+export PATH="/Users/mjb/.antigravity/antigravity/bin:$PATH"
+
 # opencode
-export PATH=/Volumes/mm2ssd/mjb/.opencode/bin:$PATH
+export PATH=/Users/mjb/.opencode/bin:$PATH
 
-[ ! -f "$HOME/.x-cmd.root/X" ] || . "$HOME/.x-cmd.root/X" # boot up x-cmd.
+. "$HOME/.langflow/uv/env"
 
+# pnpm
+export PNPM_HOME="/Users/mjb/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
+
+# bun completions
+[ -s "/Volumes/mm2ssd/mjb2/dotfiles2/.bun/_bun" ] && source "/Volumes/mm2ssd/mjb2/dotfiles2/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+eval "$(openv init zsh)"

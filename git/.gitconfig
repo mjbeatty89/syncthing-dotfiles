@@ -4,8 +4,7 @@
 	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUZGIRBlW1OGFVQU+fAS9iYoNxG6Y1a5ywdulZ1fJi3
 
 [core]
-	pager = delta
-	editor = vim
+	editor = subl -w
 	autocrlf = input
 
 [delta]
@@ -77,3 +76,5 @@
 	useHttpPath = true
 [credential "https://huggingface.co"]
 	provider = generic
+[include]
+	path = ~/.gitconfig.local

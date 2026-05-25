@@ -1,5 +1,6 @@
 # Include optional 1Password SSH agent configuration
 Include ~/.ssh/1Password/config
+Include ~/.ssh/config.local
 
 # Global defaults for all connections
 Host *
@@ -92,5 +93,8 @@ Host github.com github
 
 # GitHub alias for this repo
 Host mjbeatty89
-    HostName github.com
-    User git
+	HostName github.com
+	User git
+
+Host *
+	IdentityAgent ~/.1password/agent.sock
