@@ -264,6 +264,7 @@ seed_sync_dotfiles_if_needed() {
     local target_root="$SYNC_DOTFILES_DIR"
     local managed_files=(
         "shell/.zshenv"
+        "shell/zdotdir/.zshenv"
         "shell/.zshrc"
         "shell/.zprofile"
         "shell/.bashrc"
@@ -327,6 +328,10 @@ create_symlinks() {
 
     # Minimal .zshenv in HOME to point to XDG config
     safe_symlink "$ACTIVE_DOTFILES_DIR/shell/.zshenv" "$HOME/.zshenv"
+
+    # ZDOTDIR-scoped .zshenv — read by shells that already have ZDOTDIR set
+    # (for example, the OpenCode CLI's non-interactive shells).
+    safe_symlink "$ACTIVE_DOTFILES_DIR/shell/zdotdir/.zshenv" "$HOME/.config/zsh/.zshenv"
 
     # Actual zsh configurations in XDG location
     safe_symlink "$ACTIVE_DOTFILES_DIR/shell/.zshrc" "$HOME/.config/zsh/.zshrc"
