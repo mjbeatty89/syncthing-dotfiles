@@ -22,6 +22,8 @@ This repository manages dotfiles synchronized via Syncthing across macOS and Lin
 Before committing changes to shell scripts, verify syntax:
 
 ```bash
+zsh -n shell/.zshenv
+zsh -n shell/zdotdir/.zshenv
 zsh -n shell/.zshrc
 zsh -n shell/.zprofile
 bash -n bootstrap-linux.sh
