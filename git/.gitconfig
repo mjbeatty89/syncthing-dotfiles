@@ -62,6 +62,7 @@
 	format = ssh
 [gpg "ssh"]
 	program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+	allowedSignersFile = /home/mjb/.ssh/allowed_signers
 [commit]
 	gpgsign = true
 [filter "lfs"]
@@ -76,5 +77,7 @@
 	useHttpPath = true
 [credential "https://huggingface.co"]
 	provider = generic
+[url "git@github.com:"]
+	insteadOf = https://github.com/
 [include]
 	path = ~/.gitconfig.local

@@ -48,8 +48,19 @@ Host ubuntu ub
     HostName 10.1.11.129
     User mjb
 
-# Ubuntu Virtual Server
-Host virtual-server-tunnel
+# Oracle VPS over the private tailnet (preferred)
+# Use this alias for deliberate/manual connections. The retired
+# virtual-server-tunnel alias is suppressed in Codex Desktop state.
+Host oracle-vps
+    HostName 100.67.166.50
+    User mjb
+    Port 22
+    IdentityFile ~/.ssh/id_ed25519_ubuntu
+    IdentitiesOnly yes
+
+# Public path retained for diagnostics. UniFi allows this destination,
+# but Oracle's public endpoint currently does not answer on TCP/22.
+Host oracle-vps-public
     HostName 147.224.179.179
     User mjb
     Port 22
@@ -85,16 +96,39 @@ Host rpi* pi*
 # Git Configuration
 # ============================================
 
-# Personal GitHub
+# Personal GitHub — uses the on-disk ed25519 key so git works headless
+# (bypasses the trailing Host * 1Password-agent stanza, like Forgejo).
 Host github.com github
     HostName github.com
     User git
-    # 1Password will provide the key automatically
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    IdentityAgent none
+    StrictHostKeyChecking accept-new
 
 # GitHub alias for this repo
 Host mjbeatty89
 	HostName github.com
 	User git
+	IdentityFile ~/.ssh/id_ed25519
+	IdentitiesOnly yes
+	IdentityAgent none
+	StrictHostKeyChecking accept-new
+
+# ============================================
+# Forgejo (self-hosted, tailnet) — git over SSH
+# ============================================
+# The Forgejo image's own sshd is published on the tailnet at :2222.
+# Keyring / 1Password SSH agents are bypassed here so git works
+# non-interactively (opencode-synced startup sync, cron, CI runners).
+Host forgejo
+    HostName ai-server.manee-frog.ts.net
+    User git
+    Port 2222
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    IdentityAgent none
+    StrictHostKeyChecking accept-new
 
 Host *
 	IdentityAgent ~/.1password/agent.sock
