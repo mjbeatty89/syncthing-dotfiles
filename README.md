@@ -5,6 +5,7 @@ This repository stores shared dotfiles and bootstraps Linux devices using symlin
 ## What this repo manages
 
 - Zsh config (`shell/.zshenv`, `shell/.zshrc`, `shell/.zprofile`)
+- ZDOTDIR-scoped zsh env (`shell/zdotdir/.zshenv`)
 - Git config (`git/.gitconfig`)
 - SSH client config (`ssh/config`, never private keys)
 - VS Code settings (`vscode/settings.json`)
@@ -15,7 +16,7 @@ This repository stores shared dotfiles and bootstraps Linux devices using symlin
 ```text
 dotfiles/
 ├── bootstrap-linux.sh
-├── shell/
+├── shell/          # shell config, plus shell/zdotdir/.zshenv
 ├── git/
 ├── ssh/
 ├── vscode/
@@ -87,6 +88,7 @@ dotfiles/
 Primary expected links:
 
 - `~/.zshenv` → `shell/.zshenv`
+- `~/.config/zsh/.zshenv` → `shell/zdotdir/.zshenv`
 - `~/.config/zsh/.zshrc` → `shell/.zshrc`
 - `~/.config/zsh/.zprofile` → `shell/.zprofile`
 - `~/.gitconfig` → `git/.gitconfig`
@@ -97,6 +99,31 @@ Primary expected links:
 When existing targets are replaced, backups are saved under:
 `~/.dotfiles-backup-YYYYMMDD-HHMMSS`
 
+## ZDOTDIR-scoped zsh env
+
+`shell/zdotdir/.zshenv` exists for a subtle reason worth stating explicitly.
+
+zsh reads `$ZDOTDIR/.zshenv` **instead of** `~/.zshenv` whenever `ZDOTDIR` is already set in the environment. Some tools export `ZDOTDIR` before spawning a shell; the OpenCode CLI is one. Those shells are also non-interactive, so they never read `.zshrc`. Without a `$ZDOTDIR/.zshenv`, such a shell sees none of this repository's shell configuration at all.
+
+Keep `shell/zdotdir/.zshenv` **self-contained**. It must never `source ~/.zshenv`, because `shell/.zshenv` ends with `source "$ZDOTDIR/.zshenv"` and the two would recurse.
+
+### 1Password service account
+
+That file loads a 1Password service-account token so the `op` CLI works headlessly, with no desktop-app session delegation and no 1Password Connect dependency:
+
+```zsh
+if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ] && [ -r "$HOME/.config/op/service-account-token" ]; then
+    OP_SERVICE_ACCOUNT_TOKEN="$(command cat "$HOME/.config/op/service-account-token")"
+    export OP_SERVICE_ACCOUNT_TOKEN
+fi
+```
+
+Rules for this pattern:
+
+- The token itself lives at `~/.config/op/service-account-token` with mode `0600`. It is never committed or synced by this repository; only the loader above is.
+- The service account is scoped to the `1pserv` vault, so other vaults still require an interactive sign-in.
+- To provision another device, place the same token at that path. Alternatively, the OpenCode config repository's `restore-secrets.sh` writes it from its SOPS bundle.
+
 ## Verification commands
 
 ```bash
@@ -104,11 +131,13 @@ When existing targets are replaced, backups are saved under:
 bash -n bootstrap-linux.sh
 
 # Verify managed shell files
+zsh -n shell/.zshenv
+zsh -n shell/zdotdir/.zshenv
 zsh -n shell/.zshrc
 zsh -n shell/.zprofile
 
 # Verify symlink targets
-ls -l ~/.zshenv ~/.config/zsh/.zshrc ~/.config/zsh/.zprofile ~/.gitconfig ~/.ssh/config
+ls -l ~/.zshenv ~/.config/zsh/.zshenv ~/.config/zsh/.zshrc ~/.config/zsh/.zprofile ~/.gitconfig ~/.ssh/config
 
 # Verify Syncthing user service
 systemctl --user --no-pager status syncthing.service
